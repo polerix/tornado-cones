@@ -1,401 +1,756 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <title>Tornado Cones</title>
+    <title>Tornado Cones - CSS 3D</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #050010; /* Dark purple/black bg */
+            background-color: #000;
+            /* Background moved to ::before for blur */
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            perspective: 800px;
         }
-        canvas {
-            display: block;
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("/Users/polerixsys/.gemini/antigravity/brain/2f877949-9aad-48c2-b945-553082d99ff6/uploaded_image_1769115006822.png");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: cover;
+            filter: blur(4px);
+            z-index: -2;
+            /* Behind everything */
+            transform: scale(1.1);
+            /* Prevent blurred edges */
         }
+
         #ui {
             position: absolute;
             top: 20px;
             left: 20px;
             color: white;
+            z-index: 100;
             pointer-events: none;
             text-shadow: 0 0 5px #ff00ff;
         }
-        h1 { margin: 0; font-size: 24px; color: #d0d0ff; }
-        .hud-text { font-size: 16px; color: #aaa; margin-top: 5px; }
-        #score-display { font-size: 20px; color: #00ff00; margin-top: 10px; }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #d0d0ff;
+        }
+
+        .hud-text {
+            font-size: 16px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        #score-display {
+            font-size: 20px;
+            color: #00ff00;
+            margin-top: 10px;
+        }
+
+        /* Scene & Grid (from index2.html) */
+        .scene {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform-style: preserve-3d;
+            transform: translateX(-50%) rotateX(60deg) scale(0.6);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(6, 120px);
+            grid-template-rows: repeat(6, 120px);
+            gap: 40px;
+            transform-style: preserve-3d;
+        }
+
+        /* Entity Layer - Sits on top of the grid plane */
+        #entity-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            transform-style: preserve-3d;
+        }
+
+        /* -----------------------
+           Entity Styles 
+           ----------------------- */
+
+        /* 1. Grid Disc (Socket) */
+        /* 1. Grid Disc (Socket) */
+        .grid-disc {
+            width: 120px;
+            height: 120px;
+            background: url("/Users/polerixsys/.gemini/antigravity/brain/2f877949-9aad-48c2-b945-553082d99ff6/uploaded_image_1769115169130.png") no-repeat center center / contain;
+            /* background: #ff4444; */
+            opacity: 0.9;
+            border-radius: 50%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: background-color 0.3s;
+
+            /* 3D Thickness (Shadow only, no logic change) */
+            box-shadow:
+                0 30px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Inner detail - REMOVE */
+        .grid-disc::after {
+            content: none;
+        }
+
+
+
+        /* Empty Socket State (when disc is taken) */
+        /* Empty Socket State (when disc is taken) */
+        .grid-disc.empty {
+            /* Keep texture but darken it significantly */
+            filter: brightness(0.2);
+            box-shadow: none;
+        }
+
+        .grid-disc.empty::after {
+            background: #330000;
+        }
+
+        /* 2. Flying Disc (The Player) */
+        /* 2. Flying Disc (The Player) */
+        .flying-disc {
+            width: 120px;
+            height: 120px;
+            background: url("/Users/polerixsys/.gemini/antigravity/brain/2f877949-9aad-48c2-b945-553082d99ff6/uploaded_image_1769115169130.png") no-repeat center center / contain;
+            /* background: #ff4444; Removed flat color */
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-style: preserve-3d;
+
+            box-shadow:
+                0 30px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .flying-disc::after {
+            content: none;
+            /* Removed inner circle as artwork covers it */
+        }
+
+
+
+        .flying-disc.green {
+            /* background: #00ff00; Removed flat color */
+            filter: hue-rotate(100deg) brightness(1.2);
+            box-shadow:
+                0 0 20px #00ff00;
+            /* Glow */
+        }
+
+        .flying-disc.green::after {
+            /* background: #00cc00; */
+        }
+
+        /* 3. Tornado */
+        .tornado-group {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-style: preserve-3d;
+        }
+
+        .tornado-segment {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            border-radius: 50%;
+            background: rgba(180, 150, 255, 0.4);
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(180, 150, 255, 0.2);
+        }
+
+        /* Flip Restore Animation */
+        @keyframes flipRestore {
+            0% {
+                transform: rotateX(0deg);
+            }
+
+            50% {
+                transform: rotateX(180deg);
+            }
+
+            /* Inverted at mid-point */
+            100% {
+                transform: rotateX(360deg);
+            }
+        }
+
+        .grid-disc.restoring {
+            animation: flipRestore 0.8s ease-in-out;
+            /* While animating, ensure we don't clamp opacity if we want to show transition */
+        }
     </style>
 </head>
+
 <body>
 
-<div id="ui">
-    <h1 id="status">STATUS: STANDBY</h1>
-    <div id="score-display">SCORE: 0</div>
-    <div class="hud-text">
-        [TAB] Launch Disc | [WASD] Fly | [SPACE] Drop<br>
-        1. Survive while RED.<br>
-        2. Get caught when GREEN.
+    <div id="ui">
+        <h1 id="status">STATUS: STANDBY</h1>
+        <div id="score-display">SCORE: 0</div>
+        <div class="hud-text">
+            [SPACE] Launch/Drop | [WASD/Arrows] Fly<br>
+            1. Survive while RED.<br>
+            2. Get caught when GREEN.
+        </div>
     </div>
-</div>
 
-<canvas id="gameCanvas"></canvas>
+    <div class="scene">
+        <div class="grid" id="grid"></div>
+        <div id="entity-layer"></div>
+    </div>
 
-<script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const uiStatus = document.getElementById('status');
-    const uiScore = document.getElementById('score-display');
+    <script>
+        const uiStatus = document.getElementById('status');
+        const uiScore = document.getElementById('score-display');
+        const gridEl = document.getElementById('grid');
+        const entityLayer = document.getElementById('entity-layer');
 
-    let width, height;
-    let score = 0;
-    
-    // --- 3D Configuration ---
-    const FL = 300; // Focal Length
-    const CAM_Y = -150; // Camera height (negative is up)
-    const CAM_Z = -300; // Camera distance back
-    const GRID_Y = 100; // Floor Y position
-    const FLY_Y = -50;  // Height of flying disc
+        // --- Game Configuration (Visual Units) ---
+        // CSS Grid: 120px cell + 40px gap = 160px pitch
+        const CELL_SIZE = 120;
+        const GAP = 40;
+        const PITCH = 160;
+        const COLS = 6;
+        const ROWS = 6;
 
-    // --- Game Entities ---
-    let objects = []; // Render list
-    let gridLights = [];
-    let tornado = null;
-    let activeDisc = null;
-    let particles = [];
+        // We map game coordinates (x, z) to pixel offsets relative to the grid center?
+        // Or relative to top-left?
+        // Let's use top-left of the grid as (0,0,0) for simplicity in CSS positioning.
+        // Actually, center is better for Tornado wandering.
+        // Grid Width = 6 * 160 - 40 = 920.
+        // Center X = 460. Center Z = 460.
 
-    // --- Inputs ---
-    const keys = { w: false, a: false, s: false, d: false };
+        // --- State ---
+        let score = 0;
+        let gridLights = []; // Stores { x, z, el, hasDisc }
+        let tornado = null;
+        let activeDisc = null;
+        const keys = { w: false, a: false, s: false, d: false };
 
-    // --- Helper: 3D Projection ---
-    function project(x, y, z) {
-        const scale = FL / (FL + z + (-CAM_Z));
-        const sx = width / 2 + x * scale;
-        const sy = height / 2 + (y + CAM_Y) * scale;
-        return { x: sx, y: sy, scale: scale, visible: (z + -CAM_Z) > -FL };
-    }
+        // Ripple State
+        let rippleOrigin = { x: 0, z: 0 };
+        let rippleStartTime = -9999;
 
-    class GridLight {
-        constructor(x, z) {
-            this.x = x;
-            this.y = GRID_Y;
-            this.z = z;
-            this.hasDisc = true; // Does a disc sit here?
-        }
-        
-        update() {} // Static
-        
-        draw() {
-            const p = project(this.x, this.y, this.z);
-            if (!p.visible) return;
+        // --- classes ---
 
-            // Draw the "Socket"
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 25 * p.scale, 0, Math.PI * 2);
-            ctx.fillStyle = '#330000'; // Dark red base
-            ctx.fill();
-            ctx.strokeStyle = '#ff4400';
-            ctx.lineWidth = 2 * p.scale;
-            ctx.stroke();
+        class GridLight {
+            constructor(index) {
+                this.el = document.createElement('div');
+                this.el.className = 'grid-disc';
+                this.hasDisc = true;
+                gridEl.appendChild(this.el);
 
-            // Draw the resting disc if present
-            if (this.hasDisc) {
-                ctx.beginPath();
-                ctx.fillStyle = '#ff2200';
-                ctx.ellipse(p.x, p.y - (5 * p.scale), 20 * p.scale, 8 * p.scale, 0, 0, Math.PI*2);
-                ctx.fill();
-                // Glow
-                ctx.shadowColor = '#ff0000';
-                ctx.shadowBlur = 15;
-                ctx.fill();
-                ctx.shadowBlur = 0;
+                // Calculate center position for game logic
+                // index 0..35
+                const col = index % COLS;
+                const row = Math.floor(index / COLS);
+
+                // Local position within the grid flow (handled by CSS Grid layout automatically visually)
+                // But we need (x, z) for game logic (collisions etc)
+                // Let's say (0,0) is top-left of the grid container
+                this.x = col * PITCH + CELL_SIZE / 2;
+                this.z = row * PITCH + CELL_SIZE / 2;
+
+                // Random idle offset for bobbing animation
+                this.idlePhase = Math.random() * Math.PI * 2;
+            }
+
+            updateVisuals() {
+                if (this.hasDisc) {
+                    this.el.classList.remove('empty');
+                } else {
+                    this.el.classList.add('empty');
+                }
+            }
+
+            updateRipple(time) {
+                const age = time - rippleStartTime;
+                if (age < 0 || age > 3000) {
+                    this.el.style.transform = 'translateZ(0)';
+                    return;
+                }
+
+                const dx = this.x - rippleOrigin.x;
+                const dz = this.z - rippleOrigin.z;
+                const dist = Math.hypot(dx, dz);
+
+                // Wave parameters:
+                // Speed: how fast it moves out
+                // Frequency: how tight the waves are
+                // Decay: amplitude drops over time/distance
+
+                const speed = 0.06;
+                const frequency = 0.02;
+                const decay = 0.003;
+
+                // Calculate wave
+                // Using sin(dist - time) for outward movement
+                const phase = dist * frequency - age * speed;
+                let amplitude = 60 * Math.exp(-decay * age); // Decaying amplitude
+
+                // Also clamp amplitude so it doesn't start huge at t=0 for far items?
+                // The wave front needs to reach them.
+                // If phase is negative, it hasn't reached yet? No, phase is just phase.
+                // We want a pulse. 
+                // Simple ripple: sin function multiplied by a distance window?
+
+                // Let's try: Dampened sine wave
+                const val = Math.sin(phase);
+                let totalH = val * amplitude;
+
+                // Idle Animation (only if has disc)
+                if (this.hasDisc) {
+                    // Bob up and down: sin wave
+                    // Period: ~2-3 seconds?
+                    // Amplitude: ~5px?
+                    const idleH = Math.sin((time * 0.002) + this.idlePhase) * 5;
+                    totalH += idleH;
+                }
+
+                this.el.style.transform = `translateZ(${totalH}px)`;
+            }
+
+            restore() {
+                if (this.hasDisc || this.isRestoring) return;
+                this.isRestoring = true;
+                this.el.classList.add('restoring');
+
+                // Flip Logic:
+                // At 50% (0.4s), we switch state from empty to full.
+                setTimeout(() => {
+                    this.hasDisc = true;
+                    this.el.classList.remove('empty');
+                }, 400);
+
+                setTimeout(() => {
+                    this.el.classList.remove('restoring');
+                    this.isRestoring = false;
+                }, 800);
             }
         }
-        
-        // Depth for sorting
-        getDepth() { return this.z; }
-    }
 
-    class Tornado {
-        constructor() {
-            this.x = 0;
-            this.y = GRID_Y;
-            this.z = 200;
-            this.angle = 0;
+        class Tornado {
+            constructor() {
+                this.container = document.createElement('div');
+                this.container.className = 'tornado-group';
+                entityLayer.appendChild(this.container);
+
+                this.x = 460; // Center of grid roughly
+                this.z = 460;
+                this.angle = 0;
+
+                this.segments = [];
+
+                // Create segments (stack of discs)
+                const segmentCount = 20;
+                for (let i = 0; i < segmentCount; i++) {
+                    const seg = document.createElement('div');
+                    seg.className = 'tornado-segment';
+
+                    const progress = i / segmentCount;
+                    // Cone shape: wider at top.
+                    // Bottom radius: 20px, Top radius: 150px
+                    const radius = 20 + (progress * 130);
+
+                    seg.style.width = (radius * 2) + 'px';
+                    seg.style.height = (radius * 2) + 'px';
+
+                    // Style as textured disc
+                    seg.style.position = 'absolute';
+                    seg.style.left = '50%';
+                    seg.style.top = '50%';
+                    seg.style.borderRadius = '50%';
+                    seg.style.background = 'url("/Users/polerixsys/.gemini/antigravity/brain/2f877949-9aad-48c2-b945-553082d99ff6/uploaded_image_1769104277681.png") no-repeat center center';
+                    seg.style.backgroundSize = '120% 120%';
+                    seg.style.opacity = 0.7; // Reduced opacity
+                    seg.style.filter = 'hue-rotate(60deg)'; // Tint Magenta
+
+                    // Base height (Z). 
+                    // Height range: 0 to 300px
+                    const height = i * 15 + 10;
+                    seg.dataset.baseZ = height;
+                    // Apply initial transform to center it
+                    seg.style.transform = `translate(-50%, -50%) translateZ(${height}px)`;
+
+                    this.container.appendChild(seg);
+                    this.segments.push(seg);
+                }
+            }
+
+            update() {
+                this.angle += 0.08; // Rotation speed (reduced 90% from 0.8)
+
+                if (activeDisc) {
+                    // Chase
+                    const dx = activeDisc.x - this.x;
+                    const dz = activeDisc.z - this.z;
+                    const dist = Math.hypot(dx, dz);
+                    const speed = activeDisc.isGreen ? 3 : 1.5;
+
+                    if (dist > 10) {
+                        this.x += (dx / dist) * speed;
+                        this.z += (dz / dist) * speed;
+                    }
+                } else {
+                    // Wander
+                    this.x += Math.sin(Date.now() * 0.002) * 2;
+                    this.z += Math.cos(Date.now() * 0.002) * 2;
+                }
+
+                // Move Container
+                this.container.style.transform = `translate3d(${this.x}px, ${this.z}px, 0)`;
+
+                // Animate segments
+                this.segments.forEach((seg, i) => {
+                    const progress = i / this.segments.length;
+
+                    // Wobble effect: Higher segments wobble more
+                    const wobbleX = Math.sin(this.angle + i * 0.5) * (i * 2);
+                    const wobbleY = Math.cos(this.angle + i * 0.5) * (i * 2);
+
+                    const zPos = parseFloat(seg.dataset.baseZ);
+
+                    // RotateZ is rotation in the flat plane (which is correct for a horizontal disc).
+                    const rotation = (this.angle * 50) + (i * 10); // Offset rotation by index for spiral look
+
+                    seg.style.transform = `translate3d(${wobbleX}px, ${wobbleY}px, ${zPos}px) translate(-50%, -50%) rotateZ(${rotation}deg)`;
+                });
+            }
         }
 
-        update() {
-            this.angle += 0.1;
+        class FlyingDisc {
+            constructor(originLight) {
+                this.el = document.createElement('div');
+                this.el.className = 'flying-disc';
+                this.el.style.opacity = '0.9'; // Slightly transparent
+                entityLayer.appendChild(this.el);
+
+                this.x = originLight.x;
+                this.z = originLight.z; // Game Z (floor position Y in CSS)
+                this.y = 0; // Altitude (Z in CSS)
+
+                this.targetY = 150; // Fly height (Z)
+
+                this.state = 'launching';
+                this.isGreen = false;
+                this.timer = 0;
+                this.timeToGreen = 300;
+
+                // Idle Bobbing
+                this.idlePhase = Math.random() * 1000;
+
+                this.hasTriggeredRespawn = false;
+            }
+
+            update() {
+                if (!this.el.parentElement) return;
+
+                // 0. Captured Animation
+                if (this.state === 'captured') {
+                    // Shrink and Descend
+                    this.captureTimer++;
+                    const duration = 60; // frames
+                    const progress = Math.min(this.captureTimer / duration, 1.0);
+
+                    // Shrink
+                    const scale = 1.0 - progress;
+
+                    // Move towards center
+                    this.x += (tornado.x - this.x) * 0.1;
+                    this.z += (tornado.z - this.z) * 0.1;
+
+                    // Descend (reduce altitude Y)
+                    this.y = Math.max(0, this.y - 5);
+
+                    // Apply Transform with Scale
+                    this.el.style.transform = `translate3d(${this.x - 60}px, ${this.z - 60}px, ${this.y}px) scale(${scale})`;
+
+                    if (progress >= 1.0) {
+                        this.destroy("CAPTURED!", "white");
+                    }
+                    return;
+                }
+
+                // 1. Launch
+                if (this.state === 'launching') {
+                    this.y += 3; // Go UP (Z+)
+                    if (this.y >= this.targetY) {
+                        this.state = 'flying';
+                        uiStatus.innerText = "STATUS: AVOID TORNADO!";
+                        uiStatus.style.color = "#ff4444";
+                    }
+                }
+                // 2. Flying
+                else if (this.state === 'flying') {
+                    // Timer
+                    if (!this.isGreen) {
+                        this.timer++;
+                        if (this.timer > this.timeToGreen) {
+                            this.isGreen = true;
+                            this.el.classList.add('green');
+                            uiStatus.innerText = "STATUS: LET GO!";
+                            uiStatus.style.color = "#44ff44";
+
+                            // Trigger Respawn because we matured
+                            if (!this.hasTriggeredRespawn) {
+                                this.hasTriggeredRespawn = true;
+                                restoreRandomDisc();
+                            }
+                        }
+                    }
+
+                    // Controls
+                    if (this.isGreen) {
+                        // Suction
+                        const dx = tornado.x - this.x;
+                        const dz = tornado.z - this.z;
+                        this.x += dx * 0.05;
+                        this.z += dz * 0.05;
+                    } else {
+                        // WASD
+                        let speed = 4;
+
+                        // --- Boundary Logic ---
+                        // Safe zone: [0, 920]. Limit: [-160, 1080]
+                        const minSafe = 0;
+                        const maxSafe = 920;
+                        const margin = 160;
+
+                        // Check distances
+                        let distOut = 0;
+                        if (this.x < minSafe) distOut = Math.max(distOut, minSafe - this.x);
+                        if (this.x > maxSafe) distOut = Math.max(distOut, this.x - maxSafe);
+                        if (this.z < minSafe) distOut = Math.max(distOut, minSafe - this.z);
+                        if (this.z > maxSafe) distOut = Math.max(distOut, this.z - maxSafe);
+
+                        if (distOut > 0) {
+                            // Normalized factor 0 to 1
+                            const factor = Math.min(distOut / margin, 1.0);
+
+                            // Sluggish: Reduce speed
+                            // Logarithmic/Exponential feel:
+                            speed *= (1 - Math.pow(factor, 0.5) * 0.8);
+
+                            // Visual: Turn Blue
+                            this.el.style.filter = `hue-rotate(${factor * 200}deg) brightness(${1 + factor})`;
+                            // Or explict color change? We use hue-rotate to shift red -> blue.
+                            // Red is 0. Blue is ~240. 200 is close.
+                        } else {
+                            this.el.style.filter = 'none';
+                        }
+
+                        // Apply Move
+                        // CSS Grid: X is right, Y is down (our Z).
+                        // W (Up) -> Decrease Z (Y in CSS)
+                        if (keys.w) this.z -= speed;
+                        if (keys.s) this.z += speed;
+                        if (keys.a) this.x -= speed;
+                        if (keys.d) this.x += speed;
+
+                        // Hard Clamp at limit
+                        const limMin = minSafe - margin;
+                        const limMax = maxSafe + margin;
+                        this.x = Math.max(limMin, Math.min(limMax, this.x));
+                        this.z = Math.max(limMin, Math.min(limMax, this.z));
+                    }
+
+                    // Collision
+                    // Tornado Radius at height 150:
+                    // Bottom=20, Top=150 (at 300 height).
+                    // Linear interp: r = 20 + (150-20)*(150/300) = 20 + 130*0.5 = 85.
+                    const tornadoR = 85;
+                    const discR = 36; // 120 * 0.6 scale / 2
+
+                    // 10% inside -> Use 90% of radius
+                    const hitR = (tornadoR * 0.9) + (discR * 0.9);
+
+                    const dist = Math.hypot(this.x - tornado.x, this.z - tornado.z);
+                    if (dist < hitR) { // Reduced hitbox
+                        if (this.isGreen) {
+                            score++;
+                            uiScore.innerText = "SCORE: " + score;
+                            this.startCapture();
+                        } else {
+                            score = Math.max(0, score - 1);
+                            uiScore.innerText = "SCORE: " + score;
+                            this.destroy("DESTROYED!", "red");
+                        }
+                    }
+                }
+
+                // Sync DOM
+                // Game X -> CSS Left (X)
+                // Game Z -> CSS Top (Y)
+                // Game Y -> CSS Z (Altitude)
+                // Centering: Our element is 120x120. x,z are centers.
+                // translate3d(x, y, z).
+                // We need to shift by -50% -50% to center?
+                // Actually, best to just offset coordinate by radius -60.
+
+                // Sync DOM
+                // Add idle bob to visual Y (Z-axis in CSS)
+                const idleBob = Math.sin((Date.now() * 0.003) + this.idlePhase) * 5;
+                const visualY = this.y + idleBob;
+
+                this.el.style.transform = `translate3d(${this.x - 60}px, ${this.z - 60}px, ${visualY}px)`;
+            }
+
+            destroy(status, color) {
+                this.state = 'dying';
+                uiStatus.innerText = status;
+                uiStatus.style.color = color;
+                activeDisc = null;
+                if (this.el.parentElement) this.el.parentElement.removeChild(this.el);
+            }
+
+            startCapture() {
+                this.state = 'captured';
+                this.captureTimer = 0;
+                uiStatus.innerText = "CAPTURED!";
+                uiStatus.style.color = "white";
+                // Element remains for animation
+            }
+        }
+
+        // --- Init ---
+        function init() {
+            // Clear existing
+            gridEl.innerHTML = '';
+            gridLights = [];
+
+            for (let i = 0; i < COLS * ROWS; i++) {
+                gridLights.push(new GridLight(i));
+            }
+
+            tornado = new Tornado();
+            loop();
+        }
+
+        // Input
+        window.addEventListener('keydown', e => {
+            if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = true;
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = true;
+            if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.s = true;
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.d = true;
+
+            if (e.key === ' ') {
+                if (activeDisc) {
+                    activeDisc.destroy("DROPPED", "white");
+                } else {
+                    launchDisc();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', e => {
+            if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = false;
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = false;
+            if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.s = false;
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.d = false;
+        });
+
+
+
+        // --- Mouse / Touch Controls ---
+        const handleInteraction = (e) => {
+            // Prevent default if it's a touch event to stop scrolling/zooming
+            if (e.type === 'touchstart') e.preventDefault();
 
             if (activeDisc) {
-                // Chase logic
-                const dx = activeDisc.x - this.x;
-                const dz = activeDisc.z - this.z;
-                const dist = Math.hypot(dx, dz);
-                const speed = activeDisc.isGreen ? 3 : 1.5; // Faster if green (sucking in)
-
-                if (dist > 10) {
-                    this.x += (dx / dist) * speed;
-                    this.z += (dz / dist) * speed;
-                }
+                activeDisc.destroy("DROPPED", "white");
             } else {
-                // Idle wander
-                this.x += Math.sin(Date.now() * 0.002) * 2;
-                this.z += Math.cos(Date.now() * 0.002) * 2;
+                launchDisc();
             }
-        }
+        };
 
-        draw() {
-            // Draw multiple circles stacking up to simulate a cone
-            const segments = 15;
-            const height = 250;
-            
-            for (let i = 0; i < segments; i++) {
-                const progress = i / segments;
-                // Wobble effect
-                const wobbleX = Math.sin(this.angle + i * 0.5) * (i * 3);
-                
-                // Position of this slice
-                const ly = this.y - (progress * height);
-                const lx = this.x + wobbleX;
-                const lz = this.z;
+        window.addEventListener('mousedown', handleInteraction);
+        window.addEventListener('touchstart', handleInteraction, { passive: false });
 
-                const p = project(lx, ly, lz);
-                if (!p.visible) continue;
+        const handleMove = (clientX, clientY) => {
+            if (!activeDisc || activeDisc.state !== 'flying' || activeDisc.isGreen) return;
 
-                const radius = (10 + (progress * 50)) * p.scale;
-                
-                ctx.beginPath();
-                ctx.fillStyle = `rgba(180, 150, 255, ${0.15 + (progress * 0.1)})`;
-                ctx.ellipse(p.x, p.y, radius, radius * 0.3, 0, 0, Math.PI*2);
-                ctx.fill();
-                
-                // Add a glowing core
-                if (i % 3 === 0) {
-                    ctx.beginPath();
-                    ctx.fillStyle = `rgba(255, 255, 255, 0.3)`;
-                    ctx.ellipse(p.x, p.y, radius * 0.3, radius * 0.1, 0, 0, Math.PI*2);
-                    ctx.fill();
-                }
-            }
-        }
+            // Simple mapping from screen space to game space
+            // Center of screen (width/2, height/2) roughly maps to Grid Center (460, 460)
+            // Adjust sensitivity as needed
+            const sensitivity = 2.0;
+            const dx = (clientX - width / 2) * sensitivity;
+            const dy = (clientY - height / 2) * sensitivity;
 
-        getDepth() { return this.z; }
-    }
+            activeDisc.x = 460 + dx;
+            activeDisc.z = 460 + dy;
+        };
 
-    class FlyingDisc {
-        constructor(originLight) {
-            this.origin = originLight;
-            this.x = originLight.x;
-            this.y = originLight.y; // Starts on ground
-            this.z = originLight.z;
-            this.targetY = FLY_Y;
-            
-            this.state = 'launching'; // launching, flying, captured, dying
-            this.isGreen = false;
-            this.timer = 0;
-            this.timeToGreen = 300; // Frames
-        }
-
-        update() {
-            // 1. Launch Animation
-            if (this.state === 'launching') {
-                this.y -= 2;
-                if (this.y <= this.targetY) {
-                    this.state = 'flying';
-                    uiStatus.innerText = "STATUS: AVOID TORNADO!";
-                    uiStatus.style.color = "#ff4444";
-                }
-                return;
-            }
-
-            // 2. Flying Logic
-            if (this.state === 'flying') {
-                // Color Timer
-                if (!this.isGreen) {
-                    this.timer++;
-                    if (this.timer > this.timeToGreen) {
-                        this.isGreen = true;
-                        uiStatus.innerText = "STATUS: LET GO!";
-                        uiStatus.style.color = "#44ff44";
-                    }
-                }
-
-                // Controls
-                if (this.isGreen) {
-                    // Auto-suction towards tornado
-                    const dx = tornado.x - this.x;
-                    const dz = tornado.z - this.z;
-                    this.x += dx * 0.05;
-                    this.z += dz * 0.05;
-                } else {
-                    // Manual WASD
-                    const speed = 4;
-                    if (keys.w) this.z += speed; // In 3D engine, W is usually 'forward' (z+) or 'back' (z-). Let's maximize screen movement.
-                    if (keys.s) this.z -= speed;
-                    if (keys.a) this.x -= speed;
-                    if (keys.d) this.x += speed;
-                }
-
-                // Collision
-                const dist = Math.hypot(this.x - tornado.x, this.z - tornado.z);
-                if (dist < 40) {
-                    if (this.isGreen) {
-                        // Success
-                        score++;
-                        uiScore.innerText = "SCORE: " + score;
-                        this.state = 'captured';
-                        activeDisc = null;
-                        uiStatus.innerText = "CAPTURED!";
-                        uiStatus.style.color = "white";
-                    } else {
-                        // Fail
-                        this.state = 'dying';
-                        activeDisc = null;
-                        uiStatus.innerText = "DESTROYED!";
-                        score = Math.max(0, score - 1);
-                        uiScore.innerText = "SCORE: " + score;
-                    }
-                }
-            }
-        }
-
-        draw() {
-            if (this.state === 'captured' || this.state === 'dying') return;
-
-            const p = project(this.x, this.y, this.z);
-            if (!p.visible) return;
-
-            const color = this.isGreen ? '#00ff00' : '#ff0000';
-            const coreColor = this.isGreen ? '#ccffcc' : '#ffcccc';
-
-            // Draw Disc
-            ctx.beginPath();
-            ctx.ellipse(p.x, p.y, 20 * p.scale, 8 * p.scale, 0, 0, Math.PI*2);
-            ctx.fillStyle = color;
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 20;
-            ctx.fill();
-            ctx.shadowBlur = 0; // Reset
-
-            // Center detail
-            ctx.beginPath();
-            ctx.ellipse(p.x, p.y, 8 * p.scale, 3 * p.scale, 0, 0, Math.PI*2);
-            ctx.fillStyle = coreColor;
-            ctx.fill();
-
-            // Timer Ring (if red)
-            if (!this.isGreen) {
-                // Simple arc indicator above disc
-                ctx.beginPath();
-                ctx.arc(p.x, p.y - (15*p.scale), 5*p.scale, 0, (Math.PI*2) * (this.timer/this.timeToGreen));
-                ctx.strokeStyle = "yellow";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-        }
-
-        getDepth() { return this.z; }
-    }
-
-    // --- Engine ---
-
-    function init() {
-        resize();
-        window.addEventListener('resize', resize);
-
-        // Create Grid
-        const cols = 6;
-        const rows = 6;
-        const spacing = 80;
-        const xOffset = -((cols-1)*spacing)/2;
-        
-        for (let z = 0; z < rows; z++) {
-            for (let x = 0; x < cols; x++) {
-                gridLights.push(new GridLight(xOffset + x*spacing, z*spacing));
-            }
-        }
-
-        tornado = new Tornado();
-    }
-
-    function resize() {
-        width = window.innerWidth;
-        height = window.innerHeight;
-        canvas.width = width;
-        canvas.height = height;
-    }
-
-    function launchDisc() {
-        if (activeDisc) return; // Only one at a time for level 1
-        
-        // Find lights that have discs
-        const available = gridLights.filter(l => l.hasDisc);
-        if (available.length === 0) return;
-
-        const choice = available[Math.floor(Math.random() * available.length)];
-        choice.hasDisc = false; // Remove from floor
-        
-        activeDisc = new FlyingDisc(choice);
-    }
-
-    // Input Handling
-    window.addEventListener('keydown', e => {
-        if(e.key === 'w' || e.key === 'W') keys.w = true;
-        if(e.key === 'a' || e.key === 'A') keys.a = true;
-        if(e.key === 's' || e.key === 'S') keys.s = true;
-        if(e.key === 'd' || e.key === 'D') keys.d = true;
-        
-        if (e.key === 'Tab') {
+        window.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
+        window.addEventListener('touchmove', e => {
             e.preventDefault();
-            launchDisc();
+            const touch = e.touches[0];
+            handleMove(touch.clientX, touch.clientY);
+        }, { passive: false });
+
+        // Update Resize to capture new width/height if needed for centering logic
+        function launchDisc() {
+            if (activeDisc) return;
+            const available = gridLights.filter(l => l.hasDisc);
+            if (available.length === 0) return;
+
+            const choice = available[Math.floor(Math.random() * available.length)];
+            choice.hasDisc = false;
+            choice.updateVisuals();
+
+            // Trigger Ripple
+            rippleOrigin = { x: choice.x, z: choice.z };
+            rippleStartTime = Date.now();
+
+            activeDisc = new FlyingDisc(choice);
         }
-        
-        if (e.key === ' ' && activeDisc) {
-            // Drop logic
-            activeDisc.state = 'dying'; // Simply destroy for now, or reset
-            activeDisc = null;
-            uiStatus.innerText = "DROPPED";
+
+        function restoreRandomDisc() {
+            const candidates = gridLights.filter(l => !l.hasDisc && !l.isRestoring);
+            if (candidates.length > 0) {
+                const target = candidates[Math.floor(Math.random() * candidates.length)];
+                target.restore();
+            }
         }
-    });
 
-    window.addEventListener('keyup', e => {
-        if(e.key === 'w' || e.key === 'W') keys.w = false;
-        if(e.key === 'a' || e.key === 'A') keys.a = false;
-        if(e.key === 's' || e.key === 'S') keys.s = false;
-        if(e.key === 'd' || e.key === 'D') keys.d = false;
-    });
+        function loop() {
+            requestAnimationFrame(loop);
+            const now = Date.now();
 
-    function loop() {
-        requestAnimationFrame(loop);
-        
-        // Clear
-        ctx.fillStyle = '#050010';
-        ctx.fillRect(0, 0, width, height);
-        
-        // 1. Prepare Render List
-        objects = [...gridLights]; // Copy grid
-        objects.push(tornado);     // Add tornado
-        if (activeDisc) objects.push(activeDisc); // Add player
+            if (tornado) tornado.update();
+            if (activeDisc) activeDisc.update();
 
-        // 2. Sort by Depth (Painter's Algorithm)
-        // We want far objects (high Z) drawn first? 
-        // In our setup, Z increases going INTO the screen? 
-        // Wait, standard: Camera at negative Z. Objects at 0 to +Z.
-        // Yes, we want to draw High Z first (far away) if we are looking at them?
-        // Actually, Painter's algorithm: Draw furthest FIRST.
-        // Max Z = Furthest.
-        objects.sort((a, b) => b.getDepth() - a.getDepth());
+            // Update Ripples
+            gridLights.forEach(light => light.updateRipple(now));
+        }
 
-        // 3. Update & Draw
-        if (tornado) tornado.update();
-        if (activeDisc) activeDisc.update();
+        init();
 
-        objects.forEach(obj => obj.draw());
-    }
-
-    init();
-    loop();
-
-</script>
+    </script>
 </body>
+
 </html>
