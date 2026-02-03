@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Tornado Cones - CSS 3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sixtyfour+Convergence&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
@@ -47,6 +50,15 @@
             margin: 0;
             font-size: 24px;
             color: #d0d0ff;
+            font-family: "Sixtyfour Convergence", sans-serif;
+            font-optical-sizing: auto;
+            font-weight: 400;
+            font-style: normal;
+            font-variation-settings:
+                "BLED" 0,
+                "SCAN" 0,
+                "XELA" 0,
+                "YELA" 0;
         }
 
         .hud-text {
@@ -59,6 +71,15 @@
             font-size: 20px;
             color: #00ff00;
             margin-top: 10px;
+            font-family: "Sixtyfour Convergence", sans-serif;
+            font-optical-sizing: auto;
+            font-weight: 400;
+            font-style: normal;
+            font-variation-settings:
+                "BLED" 0,
+                "SCAN" 0,
+                "XELA" 0,
+                "YELA" 0;
         }
 
         /* Scene & Grid (from index2.html) */
@@ -204,6 +225,44 @@
             animation: flipRestore 0.8s ease-in-out;
             /* While animating, ensure we don't clamp opacity if we want to show transition */
         }
+
+        /* Joystick Controls (Mobile Only) */
+        .joystick-container {
+            display: none;
+            /* Hidden by default */
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            z-index: 200;
+            touch-action: none;
+            /* Prevent scrolling */
+        }
+
+        .joystick-knob {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            /* Let touches pass to container */
+            transition: transform 0.1s;
+        }
+
+        /* Mobile State */
+        body.is-mobile .joystick-container {
+            display: block;
+        }
+
+        /* Hide specific desktop text on mobile if needed, or adjust UI */
     </style>
 </head>
 
@@ -212,11 +271,16 @@
     <div id="ui">
         <h1 id="status">STATUS: STANDBY</h1>
         <div id="score-display">SCORE: 0</div>
-        <div class="hud-text">
+        <div class="hud-text" id="controls-hint">
             [SPACE] Launch/Drop | [WASD/Arrows] Fly<br>
             1. Survive while RED.<br>
             2. Get caught when GREEN.
         </div>
+    </div>
+
+    <!-- Joystick for Mobile -->
+    <div id="joystick" class="joystick-container">
+        <div class="joystick-knob" id="joystick-knob"></div>
     </div>
 
     <div class="scene">
@@ -354,7 +418,7 @@
             }
         }
 
-        class Tornado {
+        class DiscTornado {
             constructor() {
                 this.container = document.createElement('div');
                 this.container.className = 'tornado-group';
@@ -402,6 +466,12 @@
                 }
             }
 
+            destroy() {
+                if (this.container && this.container.parentElement) {
+                    this.container.parentElement.removeChild(this.container);
+                }
+            }
+
             update() {
                 this.angle += 0.08; // Rotation speed (reduced 90% from 0.8)
 
@@ -440,6 +510,205 @@
 
                     seg.style.transform = `translate3d(${wobbleX}px, ${wobbleY}px, ${zPos}px) translate(-50%, -50%) rotateZ(${rotation}deg)`;
                 });
+            }
+        }
+
+        class ParticleTornado {
+            constructor() {
+                this.container = document.createElement('div');
+                this.container.className = 'tornado-group-particles';
+                this.container.style.position = 'absolute';
+                this.container.style.left = '0';
+                this.container.style.top = '0';
+                this.container.style.transformStyle = 'preserve-3d';
+                entityLayer.appendChild(this.container);
+
+                this.x = 460;
+                this.z = 460;
+                this.particles = [];
+
+                const particleCount = 200;
+                for (let i = 0; i < particleCount; i++) {
+                    const el = document.createElement('div');
+                    el.style.position = 'absolute';
+                    el.style.width = '6px';
+                    el.style.height = '6px';
+                    el.style.background = 'rgba(180, 150, 255, 0.8)';
+                    el.style.borderRadius = '50%';
+                    el.style.boxShadow = '0 0 5px rgba(180, 150, 255, 0.5)';
+                    this.container.appendChild(el);
+
+                    const p = {
+                        el: el,
+                        h: Math.random() * 300,
+                        angle: Math.random() * Math.PI * 2,
+                        vSpeed: 1 + Math.random() * 2,
+                        noiseOffset: Math.random() * 100
+                    };
+                    this.particles.push(p);
+                }
+            }
+
+            destroy() {
+                if (this.container && this.container.parentElement) {
+                    this.container.parentElement.removeChild(this.container);
+                }
+            }
+
+            resetParticle(p, randomH = false) {
+                p.h = randomH ? Math.random() * 300 : 0;
+                p.angle = Math.random() * Math.PI * 2;
+                p.vSpeed = 1 + Math.random() * 2;
+            }
+
+            update() {
+                // Chase or Wander
+                if (activeDisc) {
+                    const dx = activeDisc.x - this.x;
+                    const dz = activeDisc.z - this.z;
+                    const dist = Math.hypot(dx, dz);
+                    const speed = activeDisc.isGreen ? 3 : 1.5;
+                    if (dist > 10) {
+                        this.x += (dx / dist) * speed;
+                        this.z += (dz / dist) * speed;
+                    }
+                } else {
+                    this.x += Math.sin(Date.now() * 0.002) * 2; // Wander
+                    this.z += Math.cos(Date.now() * 0.002) * 2;
+                }
+                this.container.style.transform = `translate3d(${this.x}px, ${this.z}px, 0)`;
+
+                const time = Date.now() * 0.001;
+                this.particles.forEach(p => {
+                    p.h += p.vSpeed;
+
+                    const progress = Math.max(0, p.h / 300);
+                    const currentRadius = 20 + (130 * Math.pow(progress, 0.8));
+
+                    const angularSpeed = 1000 / (currentRadius * currentRadius + 100);
+                    p.angle += angularSpeed * 10;
+
+                    if (p.h > 350) {
+                        this.resetParticle(p, false);
+                    }
+
+                    const noise = Math.sin(time * 5 + p.noiseOffset) * 10;
+                    const r = currentRadius + noise;
+                    const px = Math.cos(p.angle) * r;
+                    const py = Math.sin(p.angle) * r;
+
+                    p.el.style.transform = `translate3d(${px}px, ${py}px, ${p.h}px)`;
+                });
+            }
+        }
+
+        class CanvasTornado {
+            constructor() {
+                this.x = 460;
+                this.z = 460;
+
+                // Create Canvas Layer
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = 600; // Local canvas size
+                this.canvas.height = 600;
+                this.canvas.style.position = 'absolute';
+                this.canvas.style.left = '50%';
+                this.canvas.style.top = '50%';
+                this.canvas.style.transform = 'translate(-50%, -50%)'; // Centered on its coord
+                this.canvas.style.pointerEvents = 'none';
+
+                // We append it to a container that moves with x,z
+                this.container = document.createElement('div');
+                this.container.className = 'tornado-group-canvas';
+                this.container.style.width = '0px';
+                this.container.style.height = '0px';
+                this.container.style.position = 'absolute';
+                this.container.style.transformStyle = 'preserve-3d';
+
+                this.container.appendChild(this.canvas);
+                entityLayer.appendChild(this.container);
+
+                this.ctx = this.canvas.getContext('2d');
+
+                this.particles = [];
+                // Initialize particles
+                for (let i = 0; i < 300; i++) {
+                    this.particles.push(this.createParticle(true));
+                }
+            }
+
+            createParticle(randomY = false) {
+                return {
+                    y: randomY ? Math.random() * 400 : 0,
+                    angle: Math.random() * Math.PI * 2,
+                    speedY: 2 + Math.random() * 3,
+                    speedR: 0.05 + Math.random() * 0.1,
+                    radiusOffset: Math.random() * 20
+                };
+            }
+
+            destroy() {
+                if (this.container && this.container.parentElement) {
+                    this.container.parentElement.removeChild(this.container);
+                }
+            }
+
+            update() {
+                // Chase Logic (Shared)
+                if (activeDisc) {
+                    const dx = activeDisc.x - this.x;
+                    const dz = activeDisc.z - this.z;
+                    const dist = Math.hypot(dx, dz);
+                    const speed = activeDisc.isGreen ? 3 : 1.5;
+
+                    if (dist > 10) {
+                        this.x += (dx / dist) * speed;
+                        this.z += (dz / dist) * speed;
+                    }
+                } else {
+                    this.x += Math.sin(Date.now() * 0.002) * 2;
+                    this.z += Math.cos(Date.now() * 0.002) * 2;
+                }
+
+                // Move the container to the tornado's position on the map
+                this.container.style.transform = `translate3d(${this.x}px, ${this.z}px, 0)`;
+
+                // Render Particles on Canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
+
+                const cx = this.canvas.width / 2;
+                const cy = this.canvas.height;
+
+                this.particles.forEach(p => {
+                    // Update
+                    p.y += p.speedY; // Rise up
+                    p.angle += p.speedR; // Rotate
+
+                    // Funnel Radius
+                    const progress = p.y / 350;
+                    const funnelRadius = 10 + (progress * 140);
+
+                    // Orbit
+                    const r = funnelRadius + p.radiusOffset;
+                    const x = Math.cos(p.angle) * r;
+
+                    // Draw
+                    this.ctx.fillStyle = `hsla(280, 100%, 70%, ${1.0 - progress})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(cx + x, cy - p.y - 50, 2 + (progress * 4), 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Reset
+                    if (p.y > 400) {
+                        const newP = this.createParticle();
+                        Object.assign(p, newP);
+                    }
+                });
+
+                // Align Canvas to stand up
+                this.canvas.style.transform = 'translate(-50%, -50%) rotateX(-90deg)';
             }
         }
 
@@ -491,7 +760,7 @@
                     this.el.style.transform = `translate3d(${this.x - 60}px, ${this.z - 60}px, ${this.y}px) scale(${scale})`;
 
                     if (progress >= 1.0) {
-                        this.destroy("CAPTURED!", "white");
+                        this.destroy("DISC RENEWED", "white");
                     }
                     return;
                 }
@@ -631,7 +900,7 @@
             startCapture() {
                 this.state = 'captured';
                 this.captureTimer = 0;
-                uiStatus.innerText = "CAPTURED!";
+                uiStatus.innerText = "DISC RENEWED";
                 uiStatus.style.color = "white";
                 // Element remains for animation
             }
@@ -647,11 +916,62 @@
                 gridLights.push(new GridLight(i));
             }
 
-            tornado = new Tornado();
+            tornado = new DiscTornado();
             loop();
         }
 
+        // Toggle Tornado
+        let tornadoMode = 0; // 0: Disc, 1: Particle(DOM), 2: Canvas(CodePen-style)
+
+        function switchTornado() {
+            // Save position
+            const oldX = tornado.x;
+            const oldZ = tornado.z;
+
+            // Destroy current
+            tornado.destroy();
+
+            // Cycle Mode
+            tornadoMode = (tornadoMode + 1) % 3;
+
+            // Create new
+            if (tornadoMode === 0) {
+                tornado = new DiscTornado();
+                uiStatus.innerText = "MODE: DISC TORNADO";
+            } else if (tornadoMode === 1) {
+                tornado = new ParticleTornado();
+                uiStatus.innerText = "MODE: PARTICLE (DOM)";
+            } else {
+                tornado = new CanvasTornado();
+                uiStatus.innerText = "MODE: CODEPEN STYLE (CANVAS)";
+            }
+            uiStatus.style.color = "#d0d0ff";
+
+            // Restore position
+            tornado.x = oldX;
+            tornado.z = oldZ;
+        }
+
         // Input
+        // --- Input & Device Detection ---
+
+        // Simple Mobile Detection
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth < 800 && 'ontouchstart' in window);
+
+        if (isMobile) {
+            document.body.classList.add('is-mobile');
+            const hint = document.getElementById('controls-hint');
+            if (hint) {
+                hint.innerHTML = `
+                    (TAP ANYWHERE) Launch/Drop<br>
+                    (JOYSTICK) Fly<br>
+                    1. Survive while RED.<br>
+                    2. Get caught when GREEN.
+                `;
+            }
+        }
+
+        // 1. Keyboard (Desktop Primary)
         window.addEventListener('keydown', e => {
             if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = true;
             if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = true;
@@ -665,6 +985,10 @@
                     launchDisc();
                 }
             }
+
+            if (e.key === 't' || e.key === 'T') {
+                switchTornado();
+            }
         });
 
         window.addEventListener('keyup', e => {
@@ -674,11 +998,12 @@
             if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.d = false;
         });
 
-
-
-        // --- Mouse / Touch Controls ---
+        // 2. Touch / Mouse Interaction (Launch/Drop)
         const handleInteraction = (e) => {
-            // Prevent default if it's a touch event to stop scrolling/zooming
+            // If touching joystick, ignore
+            if (e.target.closest('.joystick-container')) return;
+
+            // Prevent default if it's a touch event to stop scrolling/zooming (except on buttons if any)
             if (e.type === 'touchstart') e.preventDefault();
 
             if (activeDisc) {
@@ -691,26 +1016,83 @@
         window.addEventListener('mousedown', handleInteraction);
         window.addEventListener('touchstart', handleInteraction, { passive: false });
 
+        // 3. Joystick Logic (Mobile Movement)
+        if (isMobile) {
+            const joystick = document.getElementById('joystick');
+            const knob = document.getElementById('joystick-knob');
+
+            let joystickActive = false;
+            let joyStartX, joyStartY;
+            const maxRadius = 35; // Max drag distance
+
+            joystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                joystickActive = true;
+                const touch = e.touches[0];
+                const rect = joystick.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                updateJoystick(touch.clientX, touch.clientY, centerX, centerY);
+            }, { passive: false });
+
+            joystick.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!joystickActive) return;
+                const touch = e.touches[0];
+                const rect = joystick.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                updateJoystick(touch.clientX, touch.clientY, centerX, centerY);
+            }, { passive: false });
+
+            const endJoystick = (e) => {
+                e.preventDefault();
+                joystickActive = false;
+                knob.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
+                keys.w = false;
+                keys.s = false;
+                keys.a = false;
+                keys.d = false;
+            };
+
+            joystick.addEventListener('touchend', endJoystick);
+            joystick.addEventListener('touchcancel', endJoystick);
+
+            function updateJoystick(clientX, clientY, centerX, centerY) {
+                let dx = clientX - centerX;
+                let dy = clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+
+                // Clamp
+                if (dist > maxRadius) {
+                    const ratio = maxRadius / dist;
+                    dx *= ratio;
+                    dy *= ratio;
+                }
+
+                // Move Knob
+                knob.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px)`;
+
+                // Map to Keys (WASD)
+                // Thresholds
+                const threshold = 10;
+                keys.w = dy < -threshold;
+                keys.s = dy > threshold;
+                keys.a = dx < -threshold;
+                keys.d = dx > threshold;
+            }
+        }
+
+        // Disabled old "Follow Mouse" Logic to enforce Keyboard/Joystick play style
+        /*
         const handleMove = (clientX, clientY) => {
             if (!activeDisc || activeDisc.state !== 'flying' || activeDisc.isGreen) return;
-
-            // Simple mapping from screen space to game space
-            // Center of screen (width/2, height/2) roughly maps to Grid Center (460, 460)
-            // Adjust sensitivity as needed
-            const sensitivity = 2.0;
-            const dx = (clientX - width / 2) * sensitivity;
-            const dy = (clientY - height / 2) * sensitivity;
-
-            activeDisc.x = 460 + dx;
-            activeDisc.z = 460 + dy;
+            // ...
         };
-
         window.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
-        window.addEventListener('touchmove', e => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            handleMove(touch.clientX, touch.clientY);
-        }, { passive: false });
+        */
 
         // Update Resize to capture new width/height if needed for centering logic
         function launchDisc() {
