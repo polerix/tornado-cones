@@ -375,7 +375,12 @@
         // --- State ---
         let score = 0;
         let gridLights = []; // Stores { x, z, el, hasDisc }
-        let tornado = null;
+        let entities = []; // All entities
+        let tornadoes = [];
+        let balls = [];
+        let cubes = [];
+
+        let tornado = null; // Deprecated, but keeping to avoid breaks if referenced elsewhere temporarily
         let activeDisc = null;
         const keys = { w: false, a: false, s: false, d: false };
 
@@ -1170,8 +1175,15 @@
                     const scale = 1.0 - progress;
 
                     // Move towards center
-                    this.x += (tornado.x - this.x) * 0.1;
-                    this.z += (tornado.z - this.z) * 0.1;
+                    // Move towards center (closest tornado or center)
+                    // If no tornado, just center (460, 460)
+                    let tx = 460, tz = 460;
+                    if (tornadoes.length > 0) {
+                        tx = tornadoes[0].x;
+                        tz = tornadoes[0].z;
+                    }
+                    this.x += (tx - this.x) * 0.1;
+                    this.z += (tz - this.z) * 0.1;
 
                     // Descend (reduce altitude Y)
                     this.y = Math.max(0, this.y - 5);
@@ -1215,11 +1227,23 @@
 
                     // Controls
                     if (this.isGreen) {
-                        // Suction
-                        const dx = tornado.x - this.x;
-                        const dz = tornado.z - this.z;
-                        this.x += dx * 0.05;
-                        this.z += dz * 0.05;
+                        // Suction: Find closest tornado
+                        let targetTornado = null;
+                        let minD = Infinity;
+                        tornadoes.forEach(t => {
+                            const d = Math.hypot(t.x - this.x, t.z - this.z);
+                            if (d < minD) {
+                                minD = d;
+                                targetTornado = t;
+                            }
+                        });
+
+                        if (targetTornado) {
+                            const dx = targetTornado.x - this.x;
+                            const dz = targetTornado.z - this.z;
+                            this.x += dx * 0.05;
+                            this.z += dz * 0.05;
+                        }
                     } else {
                         // WASD
                         let speed = 4;
@@ -1279,8 +1303,14 @@
                     // 10% inside -> Use 90% of radius
                     const hitR = (tornadoR * 0.9) + (discR * 0.9);
 
-                    const dist = Math.hypot(this.x - tornado.x, this.z - tornado.z);
-                    if (dist < hitR) { // Reduced hitbox
+                    // Check collisions with ANY tornado
+                    let hit = false;
+                    tornadoes.forEach(t => {
+                        const dist = Math.hypot(this.x - t.x, this.z - t.z);
+                        if (dist < hitR) hit = true;
+                    });
+
+                    if (hit) { // Reduced hitbox
                         if (this.isGreen) {
                             score++;
                             consecutiveSuccess++;
@@ -1368,32 +1398,7 @@
         let tornadoMode = 0; // 0: Disc, 1: Particle(DOM), 2: Canvas(CodePen-style)
 
         function switchTornado() {
-            // Save position
-            const oldX = tornado.x;
-            const oldZ = tornado.z;
-
-            // Destroy current
-            tornado.destroy();
-
-            // Cycle Mode
-            tornadoMode = (tornadoMode + 1) % 3;
-
-            // Create new
-            if (tornadoMode === 0) {
-                tornado = new DiscTornado();
-                uiStatus.innerText = "MODE: DISC TORNADO";
-            } else if (tornadoMode === 1) {
-                tornado = new ParticleTornado();
-                uiStatus.innerText = "MODE: PARTICLE (DOM)";
-            } else {
-                tornado = new CanvasTornado();
-                uiStatus.innerText = "MODE: CODEPEN STYLE (CANVAS)";
-            }
-            uiStatus.style.color = "#d0d0ff";
-
-            // Restore position
-            tornado.x = oldX;
-            tornado.z = oldZ;
+            Announcer.show("SWITCHING DISABLED", "#ff4444");
         }
 
         // Input
