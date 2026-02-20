@@ -4,16 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <title>Tornado Cones - CSS 3D</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sixtyfour+Convergence&display=swap" rel="stylesheet">
     <style>
+        @font-face {
+            font-family: 'Digibox';
+            src: url('fonts/digibox-sharp.otf') format('opentype');
+        }
+
+        @font-face {
+            font-family: 'VAG Rounded';
+            src: url('fonts/VAG Rounded Regular.ttf') format('truetype');
+        }
+
         body {
             margin: 0;
             overflow: hidden;
             background-color: #000;
             /* Background moved to ::before for blur */
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'VAG Rounded', sans-serif;
             height: 100vh;
             perspective: 800px;
         }
@@ -68,17 +75,9 @@
 
         h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 32px;
             color: #d0d0ff;
-            font-family: "Sixtyfour Convergence", sans-serif;
-            font-optical-sizing: auto;
-            font-weight: 400;
-            font-style: normal;
-            font-variation-settings:
-                "BLED" 0,
-                "SCAN" 0,
-                "XELA" 0,
-                "YELA" 0;
+            font-family: 'Digibox', sans-serif;
         }
 
         .hud-text {
@@ -88,30 +87,22 @@
         }
 
         #score-display {
-            font-size: 20px;
+            font-size: 28px;
             color: #00ff00;
             margin-top: 10px;
-            font-family: "Sixtyfour Convergence", sans-serif;
-            font-optical-sizing: auto;
-            font-weight: 400;
-            font-style: normal;
-            font-variation-settings:
-                "BLED" 0,
-                "SCAN" 0,
-                "XELA" 0,
-                "YELA" 0;
+            font-family: 'Digibox', sans-serif;
         }
 
         #high-score-display {
             position: absolute;
             top: 20px;
             right: 20px;
-            font-size: 24px;
+            font-size: 32px;
             color: #ffaa00;
             z-index: 100;
             pointer-events: none;
             text-shadow: 0 0 5px #ff4400;
-            font-family: "Sixtyfour Convergence", sans-serif;
+            font-family: 'Digibox', sans-serif;
         }
 
         /* --- Start Screen --- */
@@ -131,10 +122,10 @@
         }
 
         .start-title {
-            font-size: 64px;
+            font-size: 80px;
             color: #fff;
             text-shadow: 0 0 20px #ff00ff, 0 0 40px #00aaff;
-            font-family: "Sixtyfour Convergence", sans-serif;
+            font-family: 'Digibox', sans-serif;
             margin-bottom: 60px;
             text-align: center;
         }
@@ -408,40 +399,50 @@
 
         /* Hide specific desktop text on mobile if needed, or adjust UI */
 
-        /* Announcement Bar */
+        /* Announcement System */
         .announcement-bar {
             position: absolute;
-            bottom: 20px;
-            /* Default Desktop */
+            top: 50%;
             left: 0;
             width: 100%;
-            height: 40px;
-            overflow: hidden;
+            transform: translateY(-50%);
+            text-align: center;
             pointer-events: none;
-            z-index: 300;
-            font-family: "Sixtyfour Convergence", sans-serif;
-            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            z-index: 600;
+            font-family: 'Digibox', sans-serif;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px #00aaff;
         }
 
-        .scrolling-text {
+        .center-announcement {
             display: inline-block;
-            white-space: nowrap;
-            font-size: 24px;
-            position: absolute;
-            right: -100%;
-            /* Start off-screen right */
-            animation: scrollText 6s linear forwards;
+            font-size: 48px;
+            /* Medium lettering size */
+            color: #fff;
+            opacity: 0;
+            transform: translateX(100px);
+            /* Start to the right */
+            animation: fadeInRightFadeOut 2.5s ease-in-out forwards;
         }
 
-        @keyframes scrollText {
+        @keyframes fadeInRightFadeOut {
             0% {
-                right: -100%;
-                transform: translateX(0%);
+                opacity: 0;
+                transform: translateX(100px);
+            }
+
+            15% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            85% {
+                opacity: 1;
+                transform: translateX(0);
             }
 
             100% {
-                right: 100%;
-                transform: translateX(-100vw);
+                opacity: 0;
+                transform: translateX(-50px);
             }
         }
 
@@ -457,8 +458,7 @@
     <div id="start-screen">
         <div class="start-title">TORNADO CONES</div>
         <div id="start-disk"></div>
-        <div style="color:#aaa; margin-top: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">CLICK
-            TO START</div>
+        <div style="color:#aaa; margin-top: 30px; font-family: 'VAG Rounded', sans-serif;">CLICK TO START</div>
     </div>
 
     <div id="high-score-display">PEL: 0</div>
@@ -466,11 +466,20 @@
     <div id="ui" style="display: none;">
         <h1 id="status">STATUS: STANDBY</h1>
         <div id="score-display">SCORE: 0</div>
-        <div class="hud-text" id="controls-hint">
+        <div class="hud-text" id="controls-hint" style="font-family: 'VAG Rounded', sans-serif;">
             [SPACE] Launch/Drop | [WASD/Arrows] Fly<br>
             1. Survive while RED.<br>
             2. Get caught when GREEN.
         </div>
+    </div>
+
+    <!-- Audio Controls -->
+    <div id="audio-controls"
+        style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; gap: 15px;">
+        <img src="images/noun-musical-note-8103489.svg" id="toggle-music" width="32" height="32"
+            style="cursor: pointer; filter: invert(1); opacity: 0.8;" title="Toggle Music">
+        <img src="images/noun-sound-7599094.svg" id="toggle-sfx" width="32" height="32"
+            style="cursor: pointer; filter: invert(1); opacity: 0.8;" title="Toggle SFX">
     </div>
 
     <!-- Joystick for Mobile -->
@@ -707,8 +716,8 @@
                 }
 
                 // Announce
-                Announcer.show(`LEVEL ${n}`, "#00ffff");
-                setTimeout(() => Announcer.show("FLIP 5 DISCS", "#fff"), 2000);
+                Announcer.show(`LEVEL UP!`, "#00ffff");
+                setTimeout(() => Announcer.show("HURRY UP!", "#fff"), 2000);
 
                 // Spawn Configuration
                 // Level 1: 1 Main Tornado
@@ -751,7 +760,7 @@
                 const c = new OrangeCube();
                 entities.push(c);
                 cubes.push(c);
-                Announcer.show("CUBE INCOMING!", "#ffaa00");
+                Announcer.show("RENEWED!", "#ffaa00");
             },
 
             onFlip() {
@@ -823,7 +832,7 @@
                 this.el.innerHTML = '';
 
                 const span = document.createElement('span');
-                span.className = 'scrolling-text';
+                span.className = 'center-announcement';
                 span.innerText = text;
                 span.style.color = color;
 
@@ -848,7 +857,7 @@
 
                 const idleTime = Date.now() - this.lastTouchTime;
                 if (idleTime > 5000) {
-                    this.show("TORNADO CONES - LAUNCH TO START", "#aaa");
+                    this.show("TAP SCREEN TO LAUNCH", "#aaa");
                     // Reset timer so it loops every cycle if still idle
                     // But we want it to loop. The animation takes 6s.
                     // If we don't reset lastTouchTime, it will trigger again next check.
@@ -865,22 +874,76 @@
         const AudioController = {
             ctx: null,
             masterGain: null,
+            musicGain: null,
+            musicOsc: null,
             isInit: false,
+            sfxMuted: false,
+            musicMuted: false,
 
             init() {
                 if (this.isInit) return;
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 this.ctx = new AudioContext();
+
+                // SFX Master
                 this.masterGain = this.ctx.createGain();
                 this.masterGain.gain.value = 0.5; // Master Volume
                 this.masterGain.connect(this.ctx.destination);
+
+                // Music Master
+                this.musicGain = this.ctx.createGain();
+                this.musicGain.gain.value = 0.2; // Background music volume
+                this.musicGain.connect(this.ctx.destination);
+
                 this.isInit = true;
+
+                // Start ambient music drone
+                this.startMusic();
             },
 
             resume() {
                 if (this.ctx && this.ctx.state === 'suspended') {
                     this.ctx.resume();
                 }
+            },
+
+            startMusic() {
+                if (this.musicOsc) return;
+                const t = this.ctx.currentTime;
+
+                this.musicOsc = this.ctx.createOscillator();
+                this.musicOsc.type = 'sine';
+                this.musicOsc.frequency.value = 65.41; // C2 drone
+
+                const lfo = this.ctx.createOscillator();
+                lfo.type = 'sine';
+                lfo.frequency.value = 0.1; // Slow wave
+
+                const lfoGain = this.ctx.createGain();
+                lfoGain.gain.value = 15;
+
+                lfo.connect(lfoGain);
+                lfoGain.connect(this.musicOsc.frequency);
+                this.musicOsc.connect(this.musicGain);
+
+                this.musicOsc.start(t);
+                lfo.start(t);
+            },
+
+            toggleSfx() {
+                this.sfxMuted = !this.sfxMuted;
+                if (this.masterGain) {
+                    this.masterGain.gain.value = this.sfxMuted ? 0 : 0.5;
+                }
+                return this.sfxMuted;
+            },
+
+            toggleMusic() {
+                this.musicMuted = !this.musicMuted;
+                if (this.musicGain) {
+                    this.musicGain.gain.value = this.musicMuted ? 0 : 0.2;
+                }
+                return this.musicMuted;
             },
 
             // Sound 1: "Szouip" Flip Sound (Oscillator Slide)
@@ -1789,12 +1852,11 @@
 
                             // Announce
                             if (streakRestores >= 5) {
-                                // Level 2 Logic ignored in favor of LevelManager (but we keep the streak announcement?)
-                                // actually LevelManager handles level ups. 
-                                // Let's just show "STREAK 5" or something if we want, or nothing.
-                                // Announcer.show("STREAK 5!", "#ffd700");
+                                Announcer.show("STREAK!", "#ffd700");
+                            } else if (consecutiveSuccess >= 2) {
+                                Announcer.show("COMBO x" + consecutiveSuccess, "#44ff44");
                             } else {
-                                Announcer.show("SUCCESS!", "#44ff44");
+                                Announcer.show("GO!", "#44ff44");
                             }
 
                             LevelManager.onFlip(); // Progress Level & Check Win
@@ -1976,7 +2038,7 @@
                 activeStreakLights.forEach(l => l.setRing(false));
                 activeStreakLights.length = 0;
 
-                Announcer.show("DROPPED!", "#fff");
+                Announcer.show("DESTROYED!", "#fff");
 
                 if (gameState === 'DEMO') {
                     setTimeout(() => launchDemoDisc(), 1000);
@@ -2128,6 +2190,21 @@
             // Update Ripples
             gridLights.forEach(light => light.updateRipple(now));
         }
+
+        // Audio UI Listeners
+        document.getElementById('toggle-music').addEventListener('click', (e) => {
+            if (!AudioController.isInit) AudioController.init();
+            const muted = AudioController.toggleMusic();
+            e.target.style.opacity = muted ? "0.3" : "0.8";
+            // Prevent interaction from launching disc if clicked on mobile?
+            // Actually, the toggle icons are outside the game container.
+        });
+
+        document.getElementById('toggle-sfx').addEventListener('click', (e) => {
+            if (!AudioController.isInit) AudioController.init();
+            const muted = AudioController.toggleSfx();
+            e.target.style.opacity = muted ? "0.3" : "0.8";
+        });
 
         init();
 
