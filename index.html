@@ -82,6 +82,90 @@
                 "YELA" 0;
         }
 
+        #high-score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: #ffaa00;
+            z-index: 100;
+            pointer-events: none;
+            text-shadow: 0 0 5px #ff4400;
+            font-family: "Sixtyfour Convergence", sans-serif;
+        }
+
+        /* --- Start Screen --- */
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+            background: rgba(0, 0, 0, 0.4);
+            transition: opacity 1s;
+        }
+
+        .start-title {
+            font-size: 64px;
+            color: #fff;
+            text-shadow: 0 0 20px #ff00ff, 0 0 40px #00aaff;
+            font-family: "Sixtyfour Convergence", sans-serif;
+            margin-bottom: 60px;
+            text-align: center;
+        }
+
+        #start-disk {
+            width: 200px;
+            height: 200px;
+            background: url("images/disc_texture.png") no-repeat center center / contain;
+            border-radius: 50%;
+            cursor: pointer;
+            animation: hoverDisk 2s infinite ease-in-out;
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.5), 0 0 40px #00ff00;
+            transition: transform 0.2s;
+        }
+
+        #start-disk:hover {
+            transform: scale(1.1);
+            box-shadow: 0 30px 40px rgba(0, 0, 0, 0.6), 0 0 60px #00ff00;
+        }
+
+        @keyframes hoverDisk {
+            0% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
+
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        .swallowed {
+            animation: swallowDisk 1.5s forwards ease-in !important;
+            pointer-events: none;
+        }
+
+        @keyframes swallowDisk {
+            0% {
+                transform: scale(1) rotate(0deg) translateY(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0) rotate(1080deg) translateY(200px);
+                opacity: 0;
+            }
+        }
+
         /* Scene & Grid (from index2.html) */
         .scene {
             position: absolute;
@@ -331,7 +415,16 @@
 
 <body>
 
-    <div id="ui">
+    <div id="start-screen">
+        <div class="start-title">TORNADO CONES</div>
+        <div id="start-disk"></div>
+        <div style="color:#aaa; margin-top: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">CLICK
+            TO START</div>
+    </div>
+
+    <div id="high-score-display">PEL: 0</div>
+
+    <div id="ui" style="display: none;">
         <h1 id="status">STATUS: STANDBY</h1>
         <div id="score-display">SCORE: 0</div>
         <div class="hud-text" id="controls-hint">
@@ -373,16 +466,166 @@
         // Center X = 460. Center Z = 460.
 
         // --- State ---
+        let gameState = 'START'; // 'START', 'PLAYING', 'DEMO'
         let score = 0;
+        let highScore = parseInt(localStorage.getItem('tornadoConesHighScore')) || 0;
         let gridLights = []; // Stores { x, z, el, hasDisc }
         let entities = []; // All entities
         let tornadoes = [];
         let balls = [];
         let cubes = [];
 
-        let tornado = null; // Deprecated, but keeping to avoid breaks if referenced elsewhere temporarily
         let activeDisc = null;
         const keys = { w: false, a: false, s: false, d: false };
+
+        // UI references
+        const startScreen = document.getElementById('start-screen');
+        const uiContainer = document.getElementById('ui');
+        const startDisk = document.getElementById('start-disk');
+        const highScoreDisplay = document.getElementById('high-score-display');
+
+        function updateHighScore() {
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('tornadoConesHighScore', highScore);
+            }
+            highScoreDisplay.innerText = `PEL: ${highScore}`;
+        }
+        updateHighScore(); // Init display
+
+        // Idle Timer State
+        let idleTimer = null;
+        let demoTimer = null;
+        const IDLE_TIMEOUT = 120000; // 2 minutes
+        const DEMO_DURATION = 60000; // 1 minute
+
+        function resetIdleTimer() {
+            clearTimeout(idleTimer);
+            if (gameState === 'START') {
+                idleTimer = setTimeout(() => startDemoMode(), IDLE_TIMEOUT);
+            }
+        }
+
+        // Listen to all interactions to reset idle timer
+        window.addEventListener('mousemove', resetIdleTimer);
+        window.addEventListener('keydown', resetIdleTimer);
+        window.addEventListener('touchstart', resetIdleTimer, { passive: true });
+
+        // --- Start Logic ---
+        const startSequence = () => {
+            if (gameState !== 'START') return;
+            startDisk.classList.add('swallowed');
+            clearTimeout(idleTimer); // stop idle timer
+
+            // Wait for animation to finish before starting
+            setTimeout(() => {
+                startScreen.style.opacity = 0;
+                setTimeout(() => {
+                    startScreen.style.display = 'none';
+                    uiContainer.style.display = 'block';
+                    startGame();
+                }, 1000); // Wait for fade out
+            }, 1500); // 1.5s is the length of swallowDisk animation
+        };
+        startDisk.addEventListener('click', startSequence);
+        startDisk.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startSequence();
+        });
+        startDisk.addEventListener('mousedown', startSequence);
+
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            consecutiveSuccess = 0;
+            streakRestores = 0;
+            activeStreakLights.length = 0;
+            uiScore.innerText = "SCORE: " + score;
+
+            // Re-init the grid
+            gridEl.innerHTML = '';
+            gridLights = [];
+            for (let i = 0; i < COLS * ROWS; i++) {
+                gridLights.push(new GridLight(i));
+            }
+
+            LevelManager.init(); // Start Level 1
+            AudioController.init(); // Init Audio (muted)
+
+            // Automatically launch first disc so game actually starts
+            setTimeout(() => {
+                if (gameState === 'PLAYING' && !activeDisc) {
+                    launchDisc();
+                }
+            }, 500);
+        }
+
+        function startDemoMode() {
+            gameState = 'DEMO';
+            startScreen.style.opacity = 0;
+            setTimeout(() => {
+                startScreen.style.display = 'none';
+                uiContainer.style.display = 'block';
+
+                uiStatus.innerText = "DEMO MODE";
+                uiStatus.style.color = "#aaaaaa";
+
+                gridEl.innerHTML = '';
+                gridLights = [];
+                for (let i = 0; i < COLS * ROWS; i++) {
+                    gridLights.push(new GridLight(i));
+                }
+
+                // Simplified level init for demo
+                entities.forEach(e => e.destroy());
+                entities = [];
+                tornadoes = [];
+                balls = [];
+                cubes = [];
+
+                LevelManager.spawnTornado(1.0);
+                setTimeout(() => launchDemoDisc(), 1000);
+
+                // End demo after 1 minute
+                demoTimer = setTimeout(() => endDemoMode(), DEMO_DURATION);
+            }, 1000);
+        }
+
+        function endDemoMode() {
+            gameState = 'START';
+            uiContainer.style.display = 'none';
+            startScreen.style.display = 'flex';
+            startScreen.style.opacity = 1;
+            startDisk.classList.remove('swallowed');
+
+            // Clear game state
+            entities.forEach(e => e.destroy());
+            entities = [];
+            tornadoes = [];
+            balls = [];
+            cubes = [];
+            gridEl.innerHTML = '';
+            if (activeDisc) activeDisc.destroy("DEMO OVER", "white");
+
+            resetIdleTimer();
+        }
+
+        function launchDemoDisc() {
+            if (gameState !== 'DEMO') return;
+            if (activeDisc) return;
+
+            const available = gridLights.filter(l => l.hasDisc);
+            if (available.length === 0) return;
+
+            const choice = available[Math.floor(Math.random() * available.length)];
+            choice.hasDisc = false;
+            choice.updateVisuals();
+
+            rippleOrigin = { x: choice.x, z: choice.z };
+            rippleStartTime = Date.now();
+            activeDisc = new FlyingDisc(choice);
+            activeDisc.isDemo = true;
+        }
 
         // Ripple State
         let rippleOrigin = { x: 0, z: 0 };
@@ -579,6 +822,165 @@
 
         const Announcer = new AnnouncementSystem();
 
+        // --- Audio Controller (Web Audio API) ---
+        const AudioController = {
+            ctx: null,
+            masterGain: null,
+            isInit: false,
+
+            init() {
+                if (this.isInit) return;
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.value = 0.5; // Master Volume
+                this.masterGain.connect(this.ctx.destination);
+                this.isInit = true;
+            },
+
+            resume() {
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+
+            // Sound 1: "Szouip" Flip Sound (Oscillator Slide)
+            playFlip() {
+                if (!this.isInit) return;
+                const t = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.masterGain);
+
+                // Oscillator: Sine/Triangle mixture (approximated by sine for now)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, t);
+                osc.frequency.exponentialRampToValueAtTime(800, t + 0.1);
+
+                // Filter: Lowpass Sweep (The "Szouip" breathiness)
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(500, t);
+                filter.frequency.exponentialRampToValueAtTime(3000, t + 0.1);
+
+                // Envelope
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.5, t + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+
+                osc.start(t);
+                osc.stop(t + 0.3);
+            },
+
+            // Sound 2: "Twomp" Launch Sound (Low Impact)
+            playLaunch() {
+                if (!this.isInit) return;
+                const t = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+
+                // Kick Drum style drop
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+
+                // Envelope
+                gain.gain.setValueAtTime(1.0, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+
+                osc.start(t);
+                osc.stop(t + 0.3);
+            },
+
+            // Sound 3: High Pitch Disc Loop
+            createDiscLoop() {
+                if (!this.isInit) return null;
+                const t = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const panner = this.ctx.createPanner();
+
+                osc.connect(gain);
+                gain.connect(panner);
+                panner.connect(this.masterGain);
+
+                // High Pitch Whine
+                osc.type = 'sine';
+                osc.frequency.value = 800;
+
+                panner.panningModel = 'HRTF';
+                panner.distanceModel = 'exponential';
+                panner.refDistance = 100;
+                panner.maxDistance = 1000;
+                panner.rolloffFactor = 1;
+
+                osc.start(t);
+
+                // Ramp up volume
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.1, t + 0.5); // Lower volume 0.1
+
+                return { osc, gain, panner };
+            },
+
+            // Sound 4: Low Bass Tornado Loop
+            createTornadoLoop() {
+                if (!this.isInit) return null;
+                const t = this.ctx.currentTime;
+
+                // Sub Bass Sine
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const panner = this.ctx.createPanner();
+
+                osc.connect(gain);
+                gain.connect(panner);
+                panner.connect(this.masterGain);
+
+                osc.type = 'triangle'; // Grittier than sine
+                osc.frequency.value = 50;
+
+                // Note: LFO modulation simplified out or can add back if needed. 
+                // Let's keep it simple first.
+
+                panner.panningModel = 'HRTF';
+                panner.distanceModel = 'linear'; // Stronger falloff feeling?
+                panner.refDistance = 100;
+                panner.maxDistance = 800;
+                panner.rolloffFactor = 1.5;
+
+                osc.start(t);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.4, t + 1.0); // Medium bass
+
+                return { osc, gain, panner };
+            },
+
+            // Spatial Update Helper
+            updatePanner(panner, x, z) {
+                if (!panner) return;
+                // Position relative to center (460, 460)
+                const ax = (x - 460);
+                const az = (z - 460); // Game Z is depth/Y-on-screen
+
+                // Web Audio: X=Right, Y=Up, Z=Back/Front.
+                // We map Game X -> Audio X
+                // Game Z -> Audio Z (Depth)
+                panner.positionX.value = ax;
+                panner.positionZ.value = az;
+                panner.positionY.value = 0;
+            }
+        };
+
         // --- classes ---
 
         class GridLight {
@@ -662,6 +1064,9 @@
                 if (this.hasDisc || this.isRestoring) return;
                 this.isRestoring = true;
                 this.el.classList.add('restoring');
+
+                // Play Sound
+                AudioController.playFlip();
 
                 // Flip Logic:
                 // At 50% (0.4s), we switch state from empty to full.
@@ -920,6 +1325,11 @@
                 // Move Container
                 this.container.style.transform = `translate3d(${this.x}px, ${this.z}px, 0)`;
 
+                // Update Audio
+                if (this.audio && this.audio.panner) {
+                    AudioController.updatePanner(this.audio.panner, this.x, this.z);
+                }
+
                 // Animate segments
                 this.segments.forEach((seg, i) => {
                     const progress = i / this.segments.length;
@@ -1159,6 +1569,9 @@
                 this.idlePhase = Math.random() * 1000;
 
                 this.hasTriggeredRespawn = false;
+
+                // Start Audio Loop
+                this.audio = AudioController.createDiscLoop();
             }
 
             update() {
@@ -1333,13 +1746,21 @@
                             consecutiveSuccess = 0; // Reset streak
                             score = Math.max(0, score - 1);
                             uiScore.innerText = "SCORE: " + score;
+                            updateHighScore();
                             this.destroy("DESTROYED!", "red");
 
                             // Check for Game Over (all discs gone)
                             const remaining = gridLights.filter(l => l.hasDisc || l.isRestoring).length;
                             // Note: activeDisc is dying, not in grid.
-                            if (remaining === 0) {
+                            if (remaining === 0 && gameState === 'PLAYING') {
                                 Announcer.show("YOU LOSE - ALL CONES LOST", "#ff4444");
+                                setTimeout(() => {
+                                    endDemoMode(); // Hacky reuse to return to start screen
+                                }, 3000);
+                            } else if (remaining === 0 && gameState === 'DEMO') {
+                                endDemoMode();
+                            } else if (gameState === 'DEMO') {
+                                setTimeout(() => launchDemoDisc(), 1000);
                             }
                         }
                     }
@@ -1361,9 +1782,42 @@
                 const visualY = this.y + idleBob;
 
                 this.el.style.transform = `translate3d(${this.x - 60}px, ${this.z - 60}px, ${visualY}px)`;
+
+                // Update Audio Panner
+                if (this.audio && this.audio.panner) {
+                    AudioController.updatePanner(this.audio.panner, this.x, this.z);
+                }
+
+                // Demo AI logic
+                if (this.isDemo) {
+                    if (this.state === 'flying') {
+                        if (this.isGreen) {
+                            // Move toward center or tornado (handled by existing suction code)
+                        } else {
+                            // Wander away from tornados safely
+                            let dx = 0, dz = 0;
+                            if (tornadoes.length > 0) {
+                                let t = tornadoes[0];
+                                dx = this.x - t.x;
+                                dz = this.z - t.z;
+                                let len = Math.hypot(dx, dz);
+                                if (len > 0) {
+                                    this.x += (dx / len) * 2;
+                                    this.z += (dz / len) * 2;
+                                }
+                            }
+                            // Keep in bounds
+                            this.x = Math.max(200, Math.min(720, this.x));
+                            this.z = Math.max(200, Math.min(720, this.z));
+                        }
+                    }
+                }
             }
 
             destroy(status, color) {
+                if (this.audio) {
+                    this.audio.osc.stop();
+                }
                 this.state = 'dying';
                 uiStatus.innerText = status;
                 uiStatus.style.color = color;
@@ -1380,18 +1834,40 @@
             }
         }
 
-        // --- Init ---
-        function init() {
-            // Clear existing
-            gridEl.innerHTML = '';
-            gridLights = [];
+        class DiscTornado {
+            constructor(scale = 1.0) {
+                this.scale = scale;
+                this.container = document.createElement('div');
+                this.container.className = 'tornado-group';
+                entityLayer.appendChild(this.container);
 
-            for (let i = 0; i < COLS * ROWS; i++) {
-                gridLights.push(new GridLight(i));
+                this.x = 460; // Center of grid roughly
+                this.z = 460;
+                this.angle = 0;
+
+                // Audio Loop
+                this.audio = AudioController.createTornadoLoop();
+
+                this.segments = [];
             }
 
-            LevelManager.init(); // Start Level 1
-            loop();
+            destroy() {
+                if (this.audio) {
+                    this.audio.osc.stop();
+                    // if (this.audio.lfo) this.audio.lfo.stop(); // LFO was commented out in createTornadoLoop
+                }
+
+                if (this.container && this.container.parentElement) {
+                    this.container.parentElement.removeChild(this.container);
+                }
+            }
+        }
+
+        // --- Init ---
+        function init() {
+            // Setup Initial State
+            resetIdleTimer();
+            loop(); // start animation loop, but gameplay logic waits for gameState
         }
 
         // Toggle Tornado
@@ -1449,6 +1925,9 @@
 
         // 2. Touch / Mouse Interaction (Launch/Drop)
         const handleInteraction = (e) => {
+            // Let the Start Screen handle its own clicks natively, particularly on touch devices
+            if (gameState === 'START') return;
+
             // If touching joystick, ignore
             if (e.target.closest('.joystick-container')) return;
 
@@ -1456,6 +1935,9 @@
             if (e.type === 'touchstart') e.preventDefault();
 
             Announcer.recordInteraction();
+
+            // Resume Audio Context
+            if (AudioController) AudioController.resume();
 
             if (activeDisc) {
                 activeDisc.destroy("DROPPED", "white");
@@ -1466,8 +1948,12 @@
                 activeStreakLights.length = 0;
 
                 Announcer.show("DROPPED!", "#fff");
+
+                if (gameState === 'DEMO') {
+                    setTimeout(() => launchDemoDisc(), 1000);
+                }
             } else {
-                launchDisc();
+                if (gameState === 'PLAYING') launchDisc();
             }
         };
 
@@ -1576,6 +2062,7 @@
             rippleStartTime = Date.now();
 
             Haptics.triggerLaunch();
+            AudioController.playLaunch(); // Play Sound
             Announcer.show("GO!", "#fff");
             activeDisc = new FlyingDisc(choice);
         }
@@ -1599,6 +2086,11 @@
         function loop() {
             requestAnimationFrame(loop);
             const now = Date.now();
+
+            if (gameState === 'START') {
+                // only update ripples if any exist (they shouldn't)
+                return;
+            }
 
             if (activeDisc) activeDisc.update();
 
