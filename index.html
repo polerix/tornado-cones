@@ -450,6 +450,68 @@
             bottom: 350px;
             /* 240px joystick + gap */
         }
+
+        body.is-mobile .center-announcement {
+            font-size: 288px;
+            /* 300% of 96px */
+        }
+
+        body.is-mobile .start-title {
+            font-size: 480px;
+            /* 300% of 160px */
+        }
+
+        body.is-mobile #score-display {
+            font-size: 84px;
+            /* 300% of 28px */
+        }
+
+        body.is-mobile #high-score-display {
+            font-size: 96px;
+            /* 300% of 32px */
+        }
+
+        /* SVG Color Filters */
+        .audio-icon {
+            cursor: pointer;
+            width: 48px;
+            height: 48px;
+            transition: filter 0.2s;
+        }
+
+        body.is-mobile .audio-icon {
+            width: 80px;
+            height: 80px;
+        }
+
+        /* Lime Green (On). Black to #32CD32 approx */
+        .icon-on {
+            filter: invert(60%) sepia(85%) saturate(1000%) hue-rotate(85deg) brightness(1.2) contrast(1.1);
+        }
+
+        /* Magenta (Off). Black to #FF00FF approx */
+        .icon-off {
+            filter: invert(40%) sepia(100%) saturate(1000%) hue-rotate(280deg) brightness(1.1) contrast(1.2);
+        }
+
+        /* Pause Overlay */
+        #pause-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 450;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            font-family: 'Digibox', sans-serif;
+            font-size: 120px;
+            color: lime;
+            text-shadow: 0 0 20px lime;
+        }
     </style>
 </head>
 
@@ -473,13 +535,16 @@
         </div>
     </div>
 
-    <!-- Audio Controls -->
+    <div id="pause-overlay">PAUSED</div>
+
+    <!-- Audio & Game Controls -->
     <div id="audio-controls"
-        style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; gap: 15px;">
-        <img src="images/noun-musical-note-8103489.svg" id="toggle-music" width="32" height="32"
-            style="cursor: pointer; filter: invert(1); opacity: 0.8;" title="Toggle Music">
-        <img src="images/noun-sound-7599094.svg" id="toggle-sfx" width="32" height="32"
-            style="cursor: pointer; filter: invert(1); opacity: 0.8;" title="Toggle SFX">
+        style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; gap: 20px; align-items: center;">
+        <img src="images/noun-musical-note-8103489.svg" id="toggle-music" class="audio-icon icon-on"
+            title="Toggle Music">
+        <img src="images/noun-sound-7599094.svg" id="toggle-sfx" class="audio-icon icon-on" title="Toggle SFX">
+        <img src="images/noun-handbrake-active-1873218.svg" id="toggle-pause" class="audio-icon icon-off"
+            title="Pause Game" style="display: none;">
     </div>
 
     <!-- Joystick for Mobile -->
@@ -532,10 +597,29 @@
         const startDisk = document.getElementById('start-disk');
         const highScoreDisplay = document.getElementById('high-score-display');
 
+        const HighScoreManager = {
+            get() {
+                return parseInt(localStorage.getItem('tornadoConesHighScore')) || 0;
+            },
+            set(val) {
+                localStorage.setItem('tornadoConesHighScore', val);
+            }
+        };
+
+        let score = 0;
+        let highScore = HighScoreManager.get();
+        let consecutiveSuccess = 0;
+        let streakRestores = 0;
+        let gameState = 'START'; // START, PLAYING, DEMO, PAUSED
+        let activeStreakLights = [];
+        let demoTimer = null;
+        const IDLE_TIMEOUT = 120000; // 2 minutes
+        const DEMO_DURATION = 60000; // 1 minute
+
         function updateHighScore() {
             if (score > highScore) {
                 highScore = score;
-                localStorage.setItem('tornadoConesHighScore', highScore);
+                HighScoreManager.set(highScore);
             }
             highScoreDisplay.innerText = `PEL: ${highScore}`;
         }
@@ -543,9 +627,6 @@
 
         // Idle Timer State
         let idleTimer = null;
-        let demoTimer = null;
-        const IDLE_TIMEOUT = 120000; // 2 minutes
-        const DEMO_DURATION = 60000; // 1 minute
 
         function resetIdleTimer() {
             clearTimeout(idleTimer);
@@ -680,10 +761,10 @@
         let rippleStartTime = -9999;
 
         // Streak State
-        let streakRestores = 0;
-        const activeStreakLights = []; // Set of lights in current streak
+        // let streakRestores = 0; // Moved to global state
+        // const activeStreakLights = []; // Set of lights in current streak // Moved to global state
 
-        let consecutiveSuccess = 0;
+        // let consecutiveSuccess = 0; // Moved to global state
 
         // Level State
         const LevelManager = {
@@ -736,8 +817,7 @@
                 }
 
                 if (n >= 5) {
-                    // Level 5: 2 Main, 2 Small (Wait, req says 2 Main, 2 Balls, Cube)
-                    // "Level 5 has two tornado, two green balls. and a orange cube"
+                    // Level 5: 2 Main, 2 Balls, Cube
                     // Let's add another main tornado
                     this.spawnTornado(1.0);
                 }
@@ -1191,7 +1271,7 @@
                 }, 400);
 
                 setTimeout(() => {
-                    this.el.classList.add('restoring');
+                    this.el.classList.remove('restoring'); // Changed from add to remove
                     this.isRestoring = false;
                 }, 800);
             }
@@ -1989,6 +2069,13 @@
 
         // 1. Keyboard (Desktop Primary)
         window.addEventListener('keydown', e => {
+            if (gameState === 'PAUSED') {
+                if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                    togglePause();
+                }
+                return;
+            }
+
             if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = true;
             if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = true;
             if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.s = true;
@@ -2005,9 +2092,15 @@
             if (e.key === 't' || e.key === 'T') {
                 switchTornado();
             }
+
+            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                togglePause();
+            }
         });
 
         window.addEventListener('keyup', e => {
+            if (gameState === 'PAUSED') return;
+
             if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = false;
             if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = false;
             if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.s = false;
@@ -2018,6 +2111,7 @@
         const handleInteraction = (e) => {
             // Let the Start Screen handle its own clicks natively, particularly on touch devices
             if (gameState === 'START') return;
+            if (gameState === 'PAUSED') return; // Ignore interactions when paused
 
             // If touching joystick, ignore
             if (e.target.closest('.joystick-container')) return;
@@ -2061,6 +2155,7 @@
             const maxRadius = 70; // Max drag distance
 
             joystick.addEventListener('touchstart', (e) => {
+                if (gameState === 'PAUSED') return;
                 e.preventDefault();
                 Announcer.recordInteraction();
                 joystickActive = true;
@@ -2073,6 +2168,7 @@
             }, { passive: false });
 
             joystick.addEventListener('touchmove', (e) => {
+                if (gameState === 'PAUSED') return;
                 e.preventDefault();
                 if (!joystickActive) return;
                 const touch = e.touches[0];
@@ -2084,6 +2180,7 @@
             }, { passive: false });
 
             const endJoystick = (e) => {
+                if (gameState === 'PAUSED') return;
                 e.preventDefault();
                 joystickActive = false;
                 knob.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
@@ -2130,7 +2227,6 @@
         window.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
         */
 
-        // Update Resize to capture new width/height if needed for centering logic
         function launchDisc() {
             if (activeDisc) return;
             const available = gridLights.filter(l => l.hasDisc);
@@ -2174,36 +2270,83 @@
             }
         }
 
+        function togglePause() {
+            if (gameState === 'START' || gameState === 'DEMO') return;
+
+            const pauseOverlay = document.getElementById('pause-overlay');
+            const uiControls = document.getElementById('ui'); // Assuming 'ui' is the main game UI container
+
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                uiControls.style.display = 'none';
+                pauseOverlay.style.display = 'flex';
+                togglePauseBtn.classList.remove('icon-off');
+                togglePauseBtn.classList.add('icon-on'); // Green means "Paused"
+                if (AudioController.ctx) AudioController.ctx.suspend();
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                uiControls.style.display = 'block';
+                pauseOverlay.style.display = 'none';
+                togglePauseBtn.classList.remove('icon-on');
+                togglePauseBtn.classList.add('icon-off'); // Magenta means "Unpaused"
+                if (AudioController.ctx) AudioController.ctx.resume();
+            }
+        }
+
         function loop() {
             requestAnimationFrame(loop);
             const now = Date.now();
 
-            if (gameState === 'START') {
-                // only update ripples if any exist (they shouldn't)
-                return;
+            if (gameState === 'START' || gameState === 'PAUSED') {
+                // only update ripples if any exist (they shouldn't on start, but might be mid-way when paused)
+                // Actually, if paused we shouldn't update ripples either to freeze them?
+                // Left's just halt logic updates.
+                if (gameState === 'START') return;
+                // If PAUSED, we still want to render the scene (blur is applied via CSS)
             }
 
-            if (activeDisc) activeDisc.update();
-
-            entities.forEach(e => e.update()); // Update all new entities
-
-            // Update Ripples
-            gridLights.forEach(light => light.updateRipple(now));
+            if (gameState !== 'PAUSED') {
+                if (activeDisc) activeDisc.update();
+                entities.forEach(e => e.update()); // Update all new entities
+                // Update Ripples
+                gridLights.forEach(light => light.updateRipple(now));
+            }
+            // renderer.render(scene, camera); // This line is not present in the original code, assuming it's a placeholder or intended addition for a 3D renderer. Keeping it commented out as it would cause an error.
         }
 
         // Audio UI Listeners
-        document.getElementById('toggle-music').addEventListener('click', (e) => {
+        const toggleMusicBtn = document.getElementById('toggle-music');
+        const toggleSfxBtn = document.getElementById('toggle-sfx');
+        const togglePauseBtn = document.getElementById('toggle-pause');
+
+        toggleMusicBtn.addEventListener('click', (e) => {
             if (!AudioController.isInit) AudioController.init();
             const muted = AudioController.toggleMusic();
-            e.target.style.opacity = muted ? "0.3" : "0.8";
-            // Prevent interaction from launching disc if clicked on mobile?
-            // Actually, the toggle icons are outside the game container.
+            e.target.className = muted ? "audio-icon icon-off" : "audio-icon icon-on";
         });
 
-        document.getElementById('toggle-sfx').addEventListener('click', (e) => {
+        toggleSfxBtn.addEventListener('click', (e) => {
             if (!AudioController.isInit) AudioController.init();
             const muted = AudioController.toggleSfx();
-            e.target.style.opacity = muted ? "0.3" : "0.8";
+            e.target.className = muted ? "audio-icon icon-off" : "audio-icon icon-on";
+        });
+
+        togglePauseBtn.addEventListener('click', (e) => {
+            if (gameState === 'START' || gameState === 'DEMO') return;
+
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                uiControls.style.display = 'none';
+                document.getElementById('pause-overlay').style.display = 'flex';
+                e.target.className = "audio-icon icon-on"; // Green means "Paused"
+                if (AudioController.ctx) AudioController.ctx.suspend();
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                uiControls.style.display = 'block';
+                document.getElementById('pause-overlay').style.display = 'none';
+                e.target.className = "audio-icon icon-off"; // Magenta means "Unpaused"
+                if (AudioController.ctx) AudioController.ctx.resume();
+            }
         });
 
         init();
