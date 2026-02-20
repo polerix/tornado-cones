@@ -1053,45 +1053,58 @@
             }
 
             updateRipple(time) {
+                let totalH = 0;
+
+                // 1. Initial Ripple Logic
                 const age = time - rippleStartTime;
-                if (age < 0 || age > 3000) {
-                    this.el.style.transform = 'translateZ(0)';
-                    return;
+                if (age >= 0 && age <= 3000) {
+                    const dx = this.x - rippleOrigin.x;
+                    const dz = this.z - rippleOrigin.z;
+                    const dist = Math.hypot(dx, dz);
+
+                    const speed = 0.06;
+                    const frequency = 0.02;
+                    const decay = 0.003;
+
+                    const phase = dist * frequency - age * speed;
+                    const amplitude = 60 * Math.exp(-decay * age);
+                    totalH += Math.sin(phase) * amplitude;
                 }
 
-                const dx = this.x - rippleOrigin.x;
-                const dz = this.z - rippleOrigin.z;
-                const dist = Math.hypot(dx, dz);
+                // 2. Continuous Tornado Wobble
+                // Add a continuous turbulent wobble to all tiles.
+                // Amplitude increases based on distance to the closest tornado.
+                let tornadoInfluence = 0;
 
-                // Wave parameters:
-                // Speed: how fast it moves out
-                // Frequency: how tight the waves are
-                // Decay: amplitude drops over time/distance
+                if (tornadoes && tornadoes.length > 0) {
+                    let minTornadoDist = Infinity;
+                    tornadoes.forEach(t => {
+                        const dist = Math.hypot(this.x - t.x, this.z - t.z);
+                        if (dist < minTornadoDist) minTornadoDist = dist;
+                    });
 
-                const speed = 0.06;
-                const frequency = 0.02;
-                const decay = 0.003;
+                    // The closer to the core, the stronger the influence
+                    // Decay the effect logaritmically to 0 when further than 500px away.
+                    const influenceRadius = 500;
+                    if (minTornadoDist < influenceRadius) {
+                        // normalized 1 (at center) to 0 (at edge)
+                        const normalizedDist = 1 - (minTornadoDist / influenceRadius);
+                        // Make the effect non-linear (stronger closer in)
+                        tornadoInfluence = Math.pow(normalizedDist, 2) * 50;
+                    }
+                }
 
-                // Calculate wave
-                // Using sin(dist - time) for outward movement
-                const phase = dist * frequency - age * speed;
-                let amplitude = 60 * Math.exp(-decay * age); // Decaying amplitude
+                // Base ambient movement even when no tornado is near
+                const ambientWobble = Math.sin((time * 0.0015) + (this.x * 0.01) + (this.z * 0.01)) * 3;
 
-                // Also clamp amplitude so it doesn't start huge at t=0 for far items?
-                // The wave front needs to reach them.
-                // If phase is negative, it hasn't reached yet? No, phase is just phase.
-                // We want a pulse. 
-                // Simple ripple: sin function multiplied by a distance window?
+                // Add chaotic fast wobble driven by tornado proximity
+                const chaosPhase = (time * 0.01) + (this.x * 0.05) + (this.z * 0.05);
+                const chaosWobble = Math.sin(chaosPhase) * tornadoInfluence;
 
-                // Let's try: Dampened sine wave
-                const val = Math.sin(phase);
-                let totalH = val * amplitude;
+                totalH += ambientWobble + chaosWobble;
 
-                // Idle Animation (only if has disc)
+                // 3. Idle Animation (only if has disc)
                 if (this.hasDisc) {
-                    // Bob up and down: sin wave
-                    // Period: ~2-3 seconds?
-                    // Amplitude: ~5px?
                     const idleH = Math.sin((time * 0.002) + this.idlePhase) * 5;
                     totalH += idleH;
                 }
