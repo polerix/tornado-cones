@@ -1259,6 +1259,7 @@
                 this.angle = 0;
 
                 this.segments = [];
+                this.audio = AudioController.createTornadoLoop();
 
                 // Create segments (stack of discs)
                 const segmentCount = 20;
@@ -1297,6 +1298,10 @@
             }
 
             destroy() {
+                if (this.audio) {
+                    this.audio.osc.stop();
+                }
+
                 if (this.container && this.container.parentElement) {
                     this.container.parentElement.removeChild(this.container);
                 }
@@ -1834,34 +1839,6 @@
             }
         }
 
-        class DiscTornado {
-            constructor(scale = 1.0) {
-                this.scale = scale;
-                this.container = document.createElement('div');
-                this.container.className = 'tornado-group';
-                entityLayer.appendChild(this.container);
-
-                this.x = 460; // Center of grid roughly
-                this.z = 460;
-                this.angle = 0;
-
-                // Audio Loop
-                this.audio = AudioController.createTornadoLoop();
-
-                this.segments = [];
-            }
-
-            destroy() {
-                if (this.audio) {
-                    this.audio.osc.stop();
-                    // if (this.audio.lfo) this.audio.lfo.stop(); // LFO was commented out in createTornadoLoop
-                }
-
-                if (this.container && this.container.parentElement) {
-                    this.container.parentElement.removeChild(this.container);
-                }
-            }
-        }
 
         // --- Init ---
         function init() {
