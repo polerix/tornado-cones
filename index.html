@@ -193,6 +193,25 @@
             left: 50%;
             transform-style: preserve-3d;
             transform: translateX(-50%) rotateX(60deg) scale(0.6);
+            animation: gridWobble 12s ease-in-out infinite alternate;
+        }
+
+        @keyframes gridWobble {
+            0% {
+                transform: translateX(-50%) rotateX(60deg) rotateZ(0deg) scale(0.6);
+            }
+
+            33% {
+                transform: translateX(-51%) rotateX(62deg) rotateZ(1deg) scale(0.605);
+            }
+
+            66% {
+                transform: translateX(-49%) rotateX(58deg) rotateZ(-1deg) scale(0.595);
+            }
+
+            100% {
+                transform: translateX(-50%) rotateX(61deg) rotateZ(1.5deg) scale(0.6);
+            }
         }
 
         .grid {
