@@ -3,6 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Tornado Cones - CSS 3D</title>
     <style>
         @font-face {
@@ -495,9 +497,9 @@
             filter: invert(60%) sepia(85%) saturate(1000%) hue-rotate(85deg) brightness(1.2) contrast(1.1) drop-shadow(0 0 5px #00ff00);
         }
 
-        /* Magenta (Off). Black to #FF00FF approx */
+        /* Magenta (Off). Black to #FF00FF approx, with glow effect matching STATUS */
         .icon-off {
-            filter: invert(40%) sepia(100%) saturate(1000%) hue-rotate(280deg) brightness(1.1) contrast(1.2);
+            filter: invert(40%) sepia(100%) saturate(1000%) hue-rotate(280deg) brightness(1.1) contrast(1.2) drop-shadow(0 0 5px #ff00ff);
         }
 
         /* Pause Overlay */
@@ -550,7 +552,7 @@
             title="Toggle Music">
         <img src="images/noun-sound-7599094.svg" id="toggle-sfx" class="audio-icon icon-on" title="Toggle SFX">
         <img src="images/noun-handbrake-active-1873218.svg" id="toggle-pause" class="audio-icon icon-off"
-            title="Pause Game" style="display: none;">
+            title="Pause Game">
     </div>
 
     <!-- Joystick for Mobile -->
