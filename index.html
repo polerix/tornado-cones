@@ -435,6 +435,10 @@
             animation: fadeInRightFadeOut 2.5s ease-in-out forwards;
         }
 
+        body.is-paused .center-announcement {
+            animation-play-state: paused;
+        }
+
         @keyframes fadeInRightFadeOut {
             0% {
                 opacity: 0;
@@ -518,6 +522,15 @@
             font-size: 120px;
             color: lime;
             text-shadow: 0 0 20px lime;
+        }
+
+        #controls-hint {
+            transition: opacity 2s ease-in-out;
+        }
+
+        #controls-hint.opacity-zero {
+            opacity: 0;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -716,6 +729,12 @@
 
             LevelManager.init(); // Start Level 1
             AudioController.init(); // Init Audio (muted)
+
+            // Hide the instructions after 20 seconds on level 1
+            gameSetTimeout(() => {
+                const hint = document.getElementById('controls-hint');
+                if (hint) hint.classList.add('opacity-zero');
+            }, 20000);
 
             // Automatically launch first disc so game actually starts
             gameSetTimeout(() => {
@@ -2375,12 +2394,14 @@
 
             if (gameState === 'PLAYING') {
                 gameState = 'PAUSED';
+                document.body.classList.add('is-paused');
                 uiContainer.style.display = 'none';
                 document.getElementById('pause-overlay').style.display = 'flex';
                 e.target.className = "audio-icon icon-on"; // Green means "Paused"
                 if (AudioController.ctx) AudioController.ctx.suspend();
             } else if (gameState === 'PAUSED') {
                 gameState = 'PLAYING';
+                document.body.classList.remove('is-paused');
                 uiContainer.style.display = 'block';
                 document.getElementById('pause-overlay').style.display = 'none';
                 e.target.className = "audio-icon icon-off"; // Magenta means "Unpaused"
