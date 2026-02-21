@@ -213,6 +213,30 @@
             }
         }
 
+        @keyframes gridWobbleMobile {
+            0% {
+                transform: translateX(-50%) rotateX(60deg) rotateZ(0deg) scale(0.42);
+            }
+
+            33% {
+                transform: translateX(-51%) rotateX(62deg) rotateZ(1deg) scale(0.425);
+            }
+
+            66% {
+                transform: translateX(-49%) rotateX(58deg) rotateZ(-1deg) scale(0.415);
+            }
+
+            100% {
+                transform: translateX(-50%) rotateX(61deg) rotateZ(1.5deg) scale(0.42);
+            }
+        }
+
+        body.is-mobile .scene {
+            top: 25%;
+            transform: translateX(-50%) rotateX(60deg) scale(0.42);
+            animation: gridWobbleMobile 12s ease-in-out infinite alternate;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(6, 120px);
