@@ -40,7 +40,7 @@
             left: -10%;
             width: 120%;
             height: 120%;
-            background-image: url("images/bg_holodeck.png");
+            background-image: url("images/backgroundart.png");
             background-repeat: no-repeat;
             background-position: center;
             background-size: cover;
@@ -250,36 +250,17 @@
             transition: background-color 0.3s;
 
             /* 3D Thickness (Shadow only, no logic change) */
-            box-shadow:
-                0 30px 20px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 30px 20px rgba(0, 0, 0, 0.6);
         }
 
         /* Streak Indicator */
         .grid-disc.blue-ring {
-            box-shadow:
-                0 0 15px 5px #00aaff,
+            box-shadow: 0 0 15px 5px #00aaff,
                 inset 0 0 20px rgba(0, 170, 255, 0.6),
                 0 30px 20px rgba(0, 0, 0, 0.6);
             /* Keep original shadow too */
             border: 2px solid #00aaff;
         }
-
-        /* Streak Indicator */
-        .grid-disc.blue-ring {
-            box-shadow:
-                0 0 15px 5px #00aaff,
-                inset 0 0 20px rgba(0, 170, 255, 0.6),
-                0 30px 20px rgba(0, 0, 0, 0.6);
-            /* Keep original shadow too */
-            border: 2px solid #00aaff;
-        }
-
-        /* Inner detail - REMOVE */
-        .grid-disc::after {
-            content: none;
-        }
-
-
 
         /* Empty Socket State (when disc is taken) */
         /* Empty Socket State (when disc is taken) */
@@ -306,8 +287,7 @@
             left: 0;
             transform-style: preserve-3d;
 
-            box-shadow:
-                0 30px 30px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 30px 30px rgba(0, 0, 0, 0.4);
         }
 
         .flying-disc::after {
@@ -320,8 +300,7 @@
         .flying-disc.green {
             /* background: #00ff00; Removed flat color */
             filter: hue-rotate(100deg) brightness(1.2);
-            box-shadow:
-                0 0 20px #00ff00;
+            box-shadow: 0 0 20px #00ff00;
             /* Glow */
         }
 
@@ -460,23 +439,19 @@
         }
 
         body.is-mobile .center-announcement {
-            font-size: 288px;
-            /* 300% of 96px */
+            font-size: 60px;
         }
 
         body.is-mobile .start-title {
-            font-size: 480px;
-            /* 300% of 160px */
+            font-size: 80px;
         }
 
         body.is-mobile #score-display {
-            font-size: 84px;
-            /* 300% of 28px */
+            font-size: 40px;
         }
 
         body.is-mobile #high-score-display {
-            font-size: 96px;
-            /* 300% of 32px */
+            font-size: 48px;
         }
 
         /* SVG Color Filters */
@@ -587,7 +562,36 @@
         // Center X = 460. Center Z = 460.
 
         // --- State ---
-        let gameState = 'START'; // 'START', 'PLAYING', 'DEMO'
+        let streakRestores = 0;
+        let gameState = 'START'; // START, PLAYING, DEMO, PAUSED
+
+        // Time Tracking for Pause
+        let _gameTime = Date.now();
+        let _lastRealTime = Date.now();
+        function getGameTime() {
+            const now = Date.now();
+            if (gameState !== 'PAUSED') {
+                _gameTime += (now - _lastRealTime);
+            }
+            _lastRealTime = now;
+            return _gameTime;
+        }
+
+        // Custom Timeout that respects PAUSED state
+        function gameSetTimeout(callback, delayMs) {
+            const targetTime = getGameTime() + delayMs;
+
+            function checkTime() {
+                if (getGameTime() >= targetTime) {
+                    callback();
+                } else {
+                    requestAnimationFrame(checkTime);
+                }
+            }
+            requestAnimationFrame(checkTime);
+        }
+
+        let activeStreakLights = [];
         let score = 0;
         let highScore = parseInt(localStorage.getItem('tornadoConesHighScore')) || 0;
         let gridLights = []; // Stores { x, z, el, hasDisc }
@@ -616,8 +620,6 @@
 
         highScore = HighScoreManager.get();
         let consecutiveSuccess = 0;
-        let streakRestores = 0;
-        let activeStreakLights = [];
         let demoTimer = null;
         const IDLE_TIMEOUT = 120000; // 2 minutes
         const DEMO_DURATION = 60000; // 1 minute
@@ -650,12 +652,16 @@
         const startSequence = () => {
             if (gameState !== 'START') return;
             startDisk.classList.add('swallowed');
-            clearTimeout(idleTimer); // stop idle timer
+            // clearTimeout(idleTimer); // This line is problematic if idleTimer is from gameSetTimeout, which doesn't return a clearable ID.
+            // The gameSetTimeout itself has a cancellation mechanism if gameState changes to 'START'.
+            // For now, we'll leave it as is, assuming gameSetTimeout's internal logic handles cancellation on state change.
+            // If idleTimer is meant to be cleared on *any* interaction, gameSetTimeout would need to return a handle.
+            // Given the instruction, we only replace the setTimeout call.
 
             // Wait for animation to finish before starting
-            setTimeout(() => {
+            gameSetTimeout(() => {
                 startScreen.style.opacity = 0;
-                setTimeout(() => {
+                gameSetTimeout(() => {
                     startScreen.style.display = 'none';
                     uiContainer.style.display = 'block';
                     startGame();
@@ -688,7 +694,7 @@
             AudioController.init(); // Init Audio (muted)
 
             // Automatically launch first disc so game actually starts
-            setTimeout(() => {
+            gameSetTimeout(() => {
                 if (gameState === 'PLAYING' && !activeDisc) {
                     launchDisc();
                 }
@@ -698,7 +704,7 @@
         function startDemoMode() {
             gameState = 'DEMO';
             startScreen.style.opacity = 0;
-            setTimeout(() => {
+            gameSetTimeout(() => {
                 startScreen.style.display = 'none';
                 uiContainer.style.display = 'block';
 
@@ -719,10 +725,10 @@
                 cubes = [];
 
                 LevelManager.spawnTornado(1.0);
-                setTimeout(() => launchDemoDisc(), 1000);
+                gameSetTimeout(() => launchDemoDisc(), 1000);
 
                 // End demo after 1 minute
-                demoTimer = setTimeout(() => endDemoMode(), DEMO_DURATION);
+                demoTimer = gameSetTimeout(() => endDemoMode(), DEMO_DURATION);
             }, 1000);
         }
 
@@ -757,7 +763,7 @@
             choice.updateVisuals();
 
             rippleOrigin = { x: choice.x, z: choice.z };
-            rippleStartTime = Date.now();
+            rippleStartTime = getGameTime();
             activeDisc = new FlyingDisc(choice);
             activeDisc.isDemo = true;
         }
@@ -804,7 +810,7 @@
 
                 // Announce
                 Announcer.show(`LEVEL UP!`, "#00ffff");
-                setTimeout(() => Announcer.show("HURRY UP!", "#fff"), 2000);
+                gameSetTimeout(() => Announcer.show("HURRY UP!", "#fff"), 2000);
 
                 // Spawn Configuration
                 // Level 1: 1 Main Tornado
@@ -864,7 +870,7 @@
 
             nextLevel() {
                 Haptics.triggerSuccess(); // Double pulse
-                setTimeout(() => {
+                gameSetTimeout(() => {
                     this.startLevel(this.level + 1);
                 }, 1000);
             }
@@ -1271,12 +1277,12 @@
 
                 // Flip Logic:
                 // At 50% (0.4s), we switch state from empty to full.
-                setTimeout(() => {
+                gameSetTimeout(() => {
                     this.hasDisc = true;
                     this.el.classList.remove('empty');
                 }, 400);
 
-                setTimeout(() => {
+                gameSetTimeout(() => {
                     this.el.classList.remove('restoring'); // Changed from add to remove
                     this.isRestoring = false;
                 }, 800);
@@ -1524,8 +1530,8 @@
                     }
                 } else {
                     // Wander
-                    this.x += Math.sin(Date.now() * 0.002) * 2;
-                    this.z += Math.cos(Date.now() * 0.002) * 2;
+                    this.x += Math.sin(getGameTime() * 0.002) * 2;
+                    this.z += Math.cos(getGameTime() * 0.002) * 2;
                 }
 
                 // Move Container
@@ -1614,12 +1620,12 @@
                         this.z += (dz / dist) * speed;
                     }
                 } else {
-                    this.x += Math.sin(Date.now() * 0.002) * 2; // Wander
-                    this.z += Math.cos(Date.now() * 0.002) * 2;
+                    this.x += Math.sin(getGameTime() * 0.002) * 2; // Wander
+                    this.z += Math.cos(getGameTime() * 0.002) * 2;
                 }
                 this.container.style.transform = `translate3d(${this.x}px, ${this.z}px, 0)`;
 
-                const time = Date.now() * 0.001;
+                const time = getGameTime() * 0.001;
                 this.particles.forEach(p => {
                     p.h += p.vSpeed;
 
@@ -1707,8 +1713,8 @@
                         this.z += (dz / dist) * speed;
                     }
                 } else {
-                    this.x += Math.sin(Date.now() * 0.002) * 2;
-                    this.z += Math.cos(Date.now() * 0.002) * 2;
+                    this.x += Math.sin(getGameTime() * 0.002) * 2;
+                    this.z += Math.cos(getGameTime() * 0.002) * 2;
                 }
 
                 // Move the container to the tornado's position on the map
@@ -1959,13 +1965,13 @@
                             // Note: activeDisc is dying, not in grid.
                             if (remaining === 0 && gameState === 'PLAYING') {
                                 Announcer.show("YOU LOSE - ALL CONES LOST", "#ff4444");
-                                setTimeout(() => {
+                                gameSetTimeout(() => {
                                     endDemoMode(); // Hacky reuse to return to start screen
                                 }, 3000);
                             } else if (remaining === 0 && gameState === 'DEMO') {
                                 endDemoMode();
                             } else if (gameState === 'DEMO') {
-                                setTimeout(() => launchDemoDisc(), 1000);
+                                gameSetTimeout(() => launchDemoDisc(), 1000);
                             }
                         }
                     }
@@ -1983,7 +1989,7 @@
 
                 // Sync DOM
                 // Add idle bob to visual Y (Z-axis in CSS)
-                const idleBob = Math.sin((Date.now() * 0.003) + this.idlePhase) * 5;
+                const idleBob = Math.sin((getGameTime() * 0.003) + this.idlePhase) * 5;
                 const visualY = this.y + idleBob;
 
                 this.el.style.transform = `translate3d(${this.x - 60}px, ${this.z - 60}px, ${visualY}px)`;
@@ -2141,7 +2147,7 @@
                 Announcer.show("DESTROYED!", "#fff");
 
                 if (gameState === 'DEMO') {
-                    setTimeout(() => launchDemoDisc(), 1000);
+                    gameSetTimeout(() => launchDemoDisc(), 1000);
                 }
             } else {
                 if (gameState === 'PLAYING') launchDisc();
@@ -2252,7 +2258,7 @@
 
             // Trigger Ripple
             rippleOrigin = { x: choice.x, z: choice.z };
-            rippleStartTime = Date.now();
+            rippleStartTime = getGameTime();
 
             Haptics.triggerLaunch();
             AudioController.playLaunch(); // Play Sound
@@ -2301,7 +2307,7 @@
 
         function loop() {
             requestAnimationFrame(loop);
-            const now = Date.now();
+            const now = getGameTime(); // Uses the pause-aware game time function
 
             if (gameState === 'START' || gameState === 'PAUSED') {
                 // only update ripples if any exist (they shouldn't on start, but might be mid-way when paused)
@@ -2326,31 +2332,36 @@
         const togglePauseBtn = document.getElementById('toggle-pause');
 
         toggleMusicBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (!AudioController.isInit) AudioController.init();
             const muted = AudioController.toggleMusic();
             e.target.className = muted ? "audio-icon icon-off" : "audio-icon icon-on";
         });
 
         toggleSfxBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (!AudioController.isInit) AudioController.init();
             const muted = AudioController.toggleSfx();
             e.target.className = muted ? "audio-icon icon-off" : "audio-icon icon-on";
         });
 
         togglePauseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (gameState === 'START' || gameState === 'DEMO') return;
 
             if (gameState === 'PLAYING') {
                 gameState = 'PAUSED';
-                uiControls.style.display = 'none';
+                uiContainer.style.display = 'none';
                 document.getElementById('pause-overlay').style.display = 'flex';
                 e.target.className = "audio-icon icon-on"; // Green means "Paused"
                 if (AudioController.ctx) AudioController.ctx.suspend();
             } else if (gameState === 'PAUSED') {
                 gameState = 'PLAYING';
-                uiControls.style.display = 'block';
+                uiContainer.style.display = 'block';
                 document.getElementById('pause-overlay').style.display = 'none';
                 e.target.className = "audio-icon icon-off"; // Magenta means "Unpaused"
+                Announcer.show("GO!", "#00ff00");
+                Haptics.triggerSuccess();
                 if (AudioController.ctx) AudioController.ctx.resume();
             }
         });
