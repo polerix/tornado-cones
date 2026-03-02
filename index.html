@@ -727,8 +727,8 @@
                 gridLights.push(new GridLight(i));
             }
 
+            AudioController.init(); // Init Audio (muted) FIRST
             LevelManager.init(); // Start Level 1
-            AudioController.init(); // Init Audio (muted)
 
             // Hide the instructions after 20 seconds on level 1
             gameSetTimeout(() => {
@@ -837,6 +837,10 @@
                 this.level = n;
                 this.flipsInLevel = 0;
                 this.goal = 5;
+
+                if (AudioController.isInit) {
+                    AudioController.setSong(n - 1);
+                }
 
                 // Clear existing entities
                 entities.forEach(e => e.destroy());
@@ -1010,7 +1014,14 @@
             ctx: null,
             masterGain: null,
             musicGain: null,
-            musicOsc: null,
+            bgMusicElement: null,
+            bgMusicNode: null,
+            playlist: [
+                'hologram%20room%20funelling%20discs.mp3',
+                'looping%20a%20disc.mp3',
+                'tornado%20cones.mp3'
+            ],
+            currentSongIndex: 0,
             isInit: false,
             sfxMuted: false,
             musicMuted: false,
@@ -1036,33 +1047,59 @@
                 this.startMusic();
             },
 
+            suspend() {
+                if (this.ctx && this.ctx.state === 'running') {
+                    this.ctx.suspend();
+                }
+                if (this.bgMusicElement) {
+                    this.bgMusicElement.pause();
+                }
+            },
+
             resume() {
                 if (this.ctx && this.ctx.state === 'suspended') {
                     this.ctx.resume();
                 }
+                if (this.bgMusicElement && !this.musicMuted) {
+                    this.bgMusicElement.play().catch(e => console.warn(e));
+                }
+            },
+
+            setSong(index) {
+                if (!this.isInit) return;
+                this.currentSongIndex = index % this.playlist.length;
+                if (this.bgMusicElement) {
+                    const wasPlaying = (this.ctx.state === 'running' && !this.musicMuted && !this.bgMusicElement.paused);
+                    this.bgMusicElement.pause();
+                    this.bgMusicElement.src = this.playlist[this.currentSongIndex];
+                    if (wasPlaying) {
+                        this.bgMusicElement.play().catch(e => console.warn(e));
+                    }
+                }
             },
 
             startMusic() {
-                if (this.musicOsc) return;
-                const t = this.ctx.currentTime;
+                if (this.bgMusicElement) {
+                    if (this.ctx.state === 'running' && !this.musicMuted) {
+                        this.bgMusicElement.play().catch(e => console.warn(e));
+                    }
+                    return;
+                }
 
-                this.musicOsc = this.ctx.createOscillator();
-                this.musicOsc.type = 'sine';
-                this.musicOsc.frequency.value = 65.41; // C2 drone
+                this.bgMusicElement = new Audio(this.playlist[this.currentSongIndex]);
+                this.bgMusicElement.loop = true;
+                this.bgMusicElement.volume = 1.0; // Handled by WebAudio gain node
 
-                const lfo = this.ctx.createOscillator();
-                lfo.type = 'sine';
-                lfo.frequency.value = 0.1; // Slow wave
+                try {
+                    this.bgMusicNode = this.ctx.createMediaElementSource(this.bgMusicElement);
+                    this.bgMusicNode.connect(this.musicGain);
+                } catch (e) {
+                    console.warn("Could not connect audio to WebAudio context:", e);
+                }
 
-                const lfoGain = this.ctx.createGain();
-                lfoGain.gain.value = 15;
-
-                lfo.connect(lfoGain);
-                lfoGain.connect(this.musicOsc.frequency);
-                this.musicOsc.connect(this.musicGain);
-
-                this.musicOsc.start(t);
-                lfo.start(t);
+                if (!this.musicMuted) {
+                    this.bgMusicElement.play().catch(e => console.warn("Audio play failed:", e));
+                }
             },
 
             toggleSfx() {
@@ -2337,14 +2374,14 @@
                 pauseOverlay.style.display = 'flex';
                 togglePauseBtn.classList.remove('icon-off');
                 togglePauseBtn.classList.add('icon-on'); // Green means "Paused"
-                if (AudioController.ctx) AudioController.ctx.suspend();
+                AudioController.suspend();
             } else if (gameState === 'PAUSED') {
                 gameState = 'PLAYING';
                 uiControls.style.display = 'block';
                 pauseOverlay.style.display = 'none';
                 togglePauseBtn.classList.remove('icon-on');
                 togglePauseBtn.classList.add('icon-off'); // Magenta means "Unpaused"
-                if (AudioController.ctx) AudioController.ctx.resume();
+                AudioController.resume();
             }
         }
 
@@ -2398,7 +2435,7 @@
                 uiContainer.style.display = 'none';
                 document.getElementById('pause-overlay').style.display = 'flex';
                 e.target.className = "audio-icon icon-on"; // Green means "Paused"
-                if (AudioController.ctx) AudioController.ctx.suspend();
+                AudioController.suspend();
             } else if (gameState === 'PAUSED') {
                 gameState = 'PLAYING';
                 document.body.classList.remove('is-paused');
@@ -2407,7 +2444,7 @@
                 e.target.className = "audio-icon icon-off"; // Magenta means "Unpaused"
                 Announcer.show("GO!", "#00ff00");
                 Haptics.triggerSuccess();
-                if (AudioController.ctx) AudioController.ctx.resume();
+                AudioController.resume();
             }
         });
 
