@@ -406,6 +406,14 @@
         /* Mobile State */
         body.is-mobile .joystick-container {
             display: block;
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid rgba(255, 0, 255, 0.4);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+        }
+
+        body.is-mobile .joystick-knob {
+            background: rgba(255, 0, 255, 0.55);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
         }
 
         /* Hide specific desktop text on mobile if needed, or adjust UI */
@@ -462,8 +470,10 @@
         }
 
         body.is-mobile .announcement-bar {
+            top: auto;
             bottom: 350px;
             /* 240px joystick + gap */
+            transform: none;
         }
 
         body.is-mobile .center-announcement {
