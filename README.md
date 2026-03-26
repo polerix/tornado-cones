@@ -1,6 +1,6 @@
-# 🌊 TornadoCones 🌊
+# 🌊 tornado-cones 🌊
 
-💧 Back to the BIG0TIME index: [https://github.com/polerix/BIG0TIME/blob/main/index.html](https://github.com/polerix/BIG0TIME/blob/main/index.html) 🫧
+💧 Back to the big0time index: [https://github.com/polerix/big0time/blob/main/index.html](https://github.com/polerix/big0time/blob/main/index.html) 🫧
 
 ---
 *Be like water, my friend. It can flow or it can crash.* 🌊
