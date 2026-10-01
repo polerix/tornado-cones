@@ -1,10 +1,10 @@
-# 🌊 TornadoCones 🌊
+# 🌊 tornado-cones 🌊
 
 A single-file, browser-based 3D CSS arcade game. Fly a disc through a 6x6 grid,
 dodge (or chase) a tornado, and chain streaks across five escalating levels
 before the run gets away from you.
 
-💧 Back to the BIG0TIME index: [https://github.com/polerix/BIG0TIME/blob/main/index.html](https://github.com/polerix/BIG0TIME/blob/main/index.html) 🫧
+💧 Back to the big0time index: [https://github.com/polerix/big0time/blob/main/index.html](https://github.com/polerix/big0time/blob/main/index.html) 🫧
 
 ## Play
 
@@ -28,3 +28,7 @@ licenses; see individual asset sources if redistributing.
 
 ---
 *Be like water, my friend. It can flow or it can crash.* 🌊
+
+
+## Deployment & Repository Status
+{}
