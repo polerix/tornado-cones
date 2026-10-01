@@ -6,8 +6,9 @@ Pages automatically.
 
 ## GitHub Pages (automated)
 
-`.github/workflows/deploy.yml` deploys the repo root to GitHub Pages on every
-push to `main`.
+`.github/workflows/deploy.yml` stages only the runtime files into `_site` and
+deploys that directory to GitHub Pages on every push to `main`. Source artwork,
+test scripts, and repository-only files are intentionally excluded.
 
 **One-time setup** (can't be done from a workflow file — it's a repo setting):
 

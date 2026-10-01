@@ -435,6 +435,7 @@
            the old fixed 240px+240px=480px reservation from the bottom edge. */
         body.is-mobile .joystick-container {
             display: block;
+            box-sizing: border-box;
             width: var(--joystick-size, 200px);
             height: var(--joystick-size, 200px);
             bottom: var(--joystick-bottom, 20px);
@@ -506,8 +507,8 @@
 
         body.is-mobile .announcement-bar {
             top: auto;
-            bottom: 350px;
-            /* 240px joystick + gap */
+            bottom: calc(var(--joystick-bottom, 20px) + var(--joystick-size, 200px) + 20px);
+            /* Keep announcements above the dynamically sized joystick. */
             transform: none;
         }
 
@@ -990,6 +991,10 @@
                 gridLights.push(new GridLight(i));
             }
 
+            // The initial mobile fit runs while #ui is hidden on the start screen.
+            // Refit now that the HUD and populated grid have measurable bounds.
+            fitMobileScene();
+
             AudioController.init(); // Init Audio (muted) FIRST
             LevelManager.init(); // Start Level 1
 
@@ -1022,6 +1027,9 @@
                 for (let i = 0; i < COLS * ROWS; i++) {
                     gridLights.push(new GridLight(i));
                 }
+
+                // Demo mode also reveals #ui after the initial mobile fit.
+                fitMobileScene();
 
                 // Simplified level init for demo
                 entities.forEach(e => e.destroy());
@@ -1301,7 +1309,6 @@
             bgMusicElement: null,
             bgMusicNode: null,
             playlist: [
-                'hologram%20room%20funelling%20discs.mp3',
                 'looping%20a%20disc.mp3',
                 'tornado%20cones.mp3'
             ],
@@ -2365,7 +2372,7 @@
                 if (Math.abs(ratio - 1) < 0.02) break; // close enough
                 // Damped step (0.9) so the search converges instead of oscillating
                 // around the non-linear curve.
-                scale = Math.max(0.15, Math.min(0.55, scale * (1 + (ratio - 1) * 0.9)));
+                scale = Math.max(0.08, Math.min(0.55, scale * (1 + (ratio - 1) * 0.9)));
             }
             root.style.setProperty('--scene-scale', scale.toFixed(4));
 
