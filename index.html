@@ -6,6 +6,26 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Tornado Cones - CSS 3D</title>
+    <meta name="description"
+        content="A 3D CSS arcade game: fly a disc through a spinning 6x6 grid, dodge the tornado, chain your streak across five escalating levels.">
+    <meta name="theme-color" content="#ff00ff">
+
+    <!-- Open Graph / social preview -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Tornado Cones">
+    <meta property="og:description"
+        content="A 3D CSS arcade game: fly a disc through a spinning 6x6 grid, dodge the tornado, chain your streak.">
+    <meta property="og:image" content="images/icon-512.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Tornado Cones">
+    <meta name="twitter:description" content="A 3D CSS arcade game: dodge the tornado, chain your streak.">
+    <meta name="twitter:image" content="images/icon-512.png">
+
+    <!-- Icons / installability -->
+    <link rel="icon" href="images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="192x192" href="images/icon-192.png">
+    <link rel="apple-touch-icon" href="images/icon-180.png">
+    <link rel="manifest" href="manifest.json">
     <style>
         @font-face {
             font-family: 'Digibox';
@@ -213,27 +233,33 @@
             }
         }
 
+        /* --scene-scale/--scene-top are computed in JS (fitMobileScene) from the
+           real viewport size and the actually-rendered HUD/joystick heights, so
+           the grid fits on short and narrow screens instead of a single fixed
+           0.42 that overflowed badly on smaller phones and in landscape. The
+           33%/66% keyframes keep the same relative wobble (~+1.2%/-1.2%) the
+           original fixed values used, just scaled off the dynamic base. */
         @keyframes gridWobbleMobile {
             0% {
-                transform: translateX(-50%) rotateX(60deg) rotateZ(0deg) scale(0.42);
+                transform: translateX(-50%) rotateX(60deg) rotateZ(0deg) scale(var(--scene-scale, 0.42));
             }
 
             33% {
-                transform: translateX(-51%) rotateX(62deg) rotateZ(1deg) scale(0.425);
+                transform: translateX(-51%) rotateX(62deg) rotateZ(1deg) scale(calc(var(--scene-scale, 0.42) * 1.0119));
             }
 
             66% {
-                transform: translateX(-49%) rotateX(58deg) rotateZ(-1deg) scale(0.415);
+                transform: translateX(-49%) rotateX(58deg) rotateZ(-1deg) scale(calc(var(--scene-scale, 0.42) * 0.9881));
             }
 
             100% {
-                transform: translateX(-50%) rotateX(61deg) rotateZ(1.5deg) scale(0.42);
+                transform: translateX(-50%) rotateX(61deg) rotateZ(1.5deg) scale(var(--scene-scale, 0.42));
             }
         }
 
         body.is-mobile .scene {
-            top: 25%;
-            transform: translateX(-50%) rotateX(60deg) scale(0.42);
+            top: var(--scene-top, 22%);
+            transform: translateX(-50%) rotateX(60deg) scale(var(--scene-scale, 0.42));
             animation: gridWobbleMobile 12s ease-in-out infinite alternate;
         }
 
@@ -400,12 +426,30 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
             /* Let touches pass to container */
-            transition: transform 0.1s;
+            transition: transform 0.1s, width 0.15s, height 0.15s;
         }
 
-        /* Mobile State */
+        /* Mobile State - size/position come from --joystick-size/--joystick-bottom,
+           computed in JS (fitMobileScene) from the actual viewport so the joystick
+           (and the grid above it) fit on small/short/landscape screens instead of
+           the old fixed 240px+240px=480px reservation from the bottom edge. */
         body.is-mobile .joystick-container {
             display: block;
+            box-sizing: border-box;
+            width: var(--joystick-size, 200px);
+            height: var(--joystick-size, 200px);
+            bottom: var(--joystick-bottom, 20px);
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid rgba(255, 0, 255, 0.4);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+            transition: width 0.15s, height 0.15s, bottom 0.15s;
+        }
+
+        body.is-mobile .joystick-knob {
+            width: var(--joystick-knob-size, 84px);
+            height: var(--joystick-knob-size, 84px);
+            background: rgba(255, 0, 255, 0.55);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
         }
 
         /* Hide specific desktop text on mobile if needed, or adjust UI */
@@ -462,8 +506,10 @@
         }
 
         body.is-mobile .announcement-bar {
-            bottom: 350px;
-            /* 240px joystick + gap */
+            top: auto;
+            bottom: calc(var(--joystick-bottom, 20px) + var(--joystick-size, 200px) + 20px);
+            /* Keep announcements above the dynamically sized joystick. */
+            transform: none;
         }
 
         body.is-mobile .center-announcement {
@@ -479,7 +525,21 @@
         }
 
         body.is-mobile #high-score-display {
-            font-size: 48px;
+            font-size: 34px;
+        }
+
+        /* STATUS (top-left) and PEL (top-right) share the same 20px top row —
+           on narrow screens the desktop 32px h1 collides with the mobile PEL
+           display. Constrain #ui's width and shrink the status text so both
+           sides have room, even for the longest status string ("STATUS:
+           AVOID TORNADO!"). */
+        body.is-mobile #ui {
+            max-width: 58%;
+        }
+
+        body.is-mobile h1 {
+            font-size: 16px;
+            line-height: 1.3;
         }
 
         /* SVG Color Filters */
@@ -491,8 +551,14 @@
         }
 
         body.is-mobile .audio-icon {
-            width: 80px;
-            height: 80px;
+            /* 80px was oversized - shrink while staying above the ~44px
+               minimum touch target (Apple HIG / Material guidelines). */
+            width: 48px;
+            height: 48px;
+        }
+
+        body.is-mobile #audio-controls {
+            gap: 14px !important;
         }
 
         /* Lime Green (On). Black to #32CD32 approx, with glow effect matching SCORE */
@@ -528,6 +594,156 @@
             transition: opacity 2s ease-in-out;
         }
 
+        /* --- Lore / Narrative Layer --- */
+        #lore-trigger {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff00ff;
+            opacity: 0.6;
+            font-size: 12px;
+            letter-spacing: 2px;
+            font-family: 'VAG Rounded', sans-serif;
+            cursor: pointer;
+            text-shadow: 0 0 6px #ff00ff;
+            transition: opacity 0.2s;
+            padding: 8px 12px;
+            /* Larger touch target than the visible text */
+        }
+
+        #lore-trigger:hover,
+        #lore-trigger:focus {
+            opacity: 1;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1500;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal-panel {
+            max-width: 560px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            background: rgba(10, 0, 20, 0.9);
+            border: 1px solid rgba(255, 0, 255, 0.4);
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(255, 0, 255, 0.25);
+            padding: 28px 32px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-family: 'Digibox', sans-serif;
+            font-size: 28px;
+            color: #fff;
+            text-shadow: 0 0 10px #ff00ff, 0 0 20px #00aaff;
+            margin-bottom: 18px;
+            letter-spacing: 1px;
+        }
+
+        .modal-body {
+            font-family: 'VAG Rounded', sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #ddd;
+            text-align: left;
+        }
+
+        .modal-signoff {
+            display: inline-block;
+            margin-top: 10px;
+            color: #aaa;
+            font-style: italic;
+            font-size: 13px;
+        }
+
+        .modal-footnote {
+            margin-top: 20px;
+            font-family: 'VAG Rounded', sans-serif;
+            font-size: 11px;
+            color: #777;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 14px;
+        }
+
+        .modal-close {
+            margin-top: 20px;
+            display: inline-block;
+            font-family: 'VAG Rounded', sans-serif;
+            color: #00aaff;
+            cursor: pointer;
+            letter-spacing: 1px;
+            padding: 8px 16px;
+        }
+
+        .modal-close:hover,
+        .modal-close:focus {
+            color: #fff;
+        }
+
+        .epilogue-panel {
+            border-color: rgba(0, 255, 255, 0.5);
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.3);
+            cursor: pointer;
+        }
+
+        .epilogue-panel .modal-title {
+            color: #fff;
+            text-shadow: 0 0 10px #00ffff, 0 0 24px #ff00ff;
+        }
+
+        .modal-hint {
+            margin-top: 22px;
+            font-family: 'VAG Rounded', sans-serif;
+            font-size: 12px;
+            letter-spacing: 2px;
+            color: #666;
+            animation: hintPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes hintPulse {
+
+            0%,
+            100% {
+                opacity: 0.4;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        body.is-mobile .modal-title {
+            font-size: 22px;
+        }
+
+        body.is-mobile .modal-body {
+            font-size: 14px;
+        }
+
+        body.is-mobile #lore-trigger {
+            bottom: 16px;
+        }
+
         #controls-hint.opacity-zero {
             opacity: 0;
             pointer-events: none;
@@ -539,14 +755,49 @@
 
     <div id="start-screen">
         <div class="start-title">TORNADO CONES</div>
-        <div id="start-disk"></div>
+        <div id="start-disk" tabindex="0" role="button" aria-label="Start game"></div>
         <div style="color:#aaa; margin-top: 30px; font-family: 'VAG Rounded', sans-serif;">CLICK TO START</div>
+        <div id="lore-trigger" tabindex="0" role="button" aria-label="Read recovered transmission log">TRANSMISSION LOG</div>
     </div>
 
     <div id="high-score-display">PEL: 0</div>
 
+    <!-- Lore Modal -->
+    <div id="lore-modal" class="modal-overlay">
+        <div class="modal-panel">
+            <div class="modal-title">RECOVERED TRANSMISSION — FRAGMENT 7</div>
+            <div class="modal-body">
+                The pattern didn't arrive with a sender. It rode in on routine noise, folded into six rows and six
+                columns, cones spinning where nothing should spin.<br><br>
+                Whoever built it understood attention better than we do - how to hold it, reward it, keep it. Early
+                testers don't describe it as fun. They describe it as relief. The score climbs, and so does the
+                wanting. Nobody who plays past the fifth turn has asked to stop.<br><br>
+                We don't know what it's counting toward. We're releasing it anyway.<br><br>
+                You'll understand once you've played long enough.<br>
+                <span class="modal-signoff">- last analyst still filing reports</span>
+            </div>
+            <div class="modal-footnote">Tornado Cones is an original work. Any resemblance to games depicted
+                elsewhere is thematic homage, not affiliation.</div>
+            <div class="modal-close" id="lore-modal-close" tabindex="0" role="button" aria-label="Close">[ CLOSE ]</div>
+        </div>
+    </div>
+
+    <!-- Epilogue Overlay (rare, milestone-gated) -->
+    <div id="epilogue-overlay" class="modal-overlay">
+        <div class="modal-panel epilogue-panel" tabindex="0" role="button" aria-label="Continue playing">
+            <div class="modal-title">SIGNAL LOCKED</div>
+            <div class="modal-body">
+                You were never chasing a score. You were the measurement - how long a person keeps going once
+                something makes staying easy.<br><br>
+                Transmission ends here. Thank you for playing.<br>
+                <span class="modal-signoff">[ fragment ends ]</span>
+            </div>
+            <div class="modal-hint">TAP TO CONTINUE</div>
+        </div>
+    </div>
+
     <div id="ui" style="display: none;">
-        <h1 id="status">STATUS: STANDBY</h1>
+        <h1 id="status" aria-live="polite">STATUS: STANDBY</h1>
         <div id="score-display">SCORE: 0</div>
         <div class="hud-text" id="controls-hint" style="font-family: 'VAG Rounded', sans-serif;">
             [SPACE] Launch/Drop | [WASD/Arrows] Fly<br>
@@ -561,10 +812,11 @@
     <div id="audio-controls"
         style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; gap: 20px; align-items: center;">
         <img src="images/noun-musical-note-8103489.svg" id="toggle-music" class="audio-icon icon-on"
-            title="Toggle Music">
-        <img src="images/noun-sound-7599094.svg" id="toggle-sfx" class="audio-icon icon-on" title="Toggle SFX">
+            title="Toggle Music" alt="Toggle music" tabindex="0" role="button">
+        <img src="images/noun-sound-7599094.svg" id="toggle-sfx" class="audio-icon icon-on" title="Toggle SFX"
+            alt="Toggle sound effects" tabindex="0" role="button">
         <img src="images/noun-handbrake-active-1873218.svg" id="toggle-pause" class="audio-icon icon-off"
-            title="Pause Game">
+            title="Pause Game" alt="Pause game" tabindex="0" role="button">
     </div>
 
     <!-- Joystick for Mobile -->
@@ -601,6 +853,7 @@
         // --- State ---
         let streakRestores = 0;
         let gameState = 'START'; // START, PLAYING, DEMO, PAUSED
+        let epilogueActive = false; // True while the hidden epilogue overlay is on screen (freezes gameplay like PAUSED)
 
         // Time Tracking for Pause
         let _gameTime = Date.now();
@@ -712,6 +965,17 @@
         });
         startDisk.addEventListener('mousedown', startSequence);
 
+        // Keyboard access for tabindex="0" controls (start disk, audio icons) —
+        // browsers only auto-map Enter/Space to native <button>, not divs/imgs.
+        document.querySelectorAll('[role="button"][tabindex="0"]').forEach(el => {
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    el.click();
+                }
+            });
+        });
+
         function startGame() {
             gameState = 'PLAYING';
             score = 0;
@@ -726,6 +990,10 @@
             for (let i = 0; i < COLS * ROWS; i++) {
                 gridLights.push(new GridLight(i));
             }
+
+            // The initial mobile fit runs while #ui is hidden on the start screen.
+            // Refit now that the HUD and populated grid have measurable bounds.
+            fitMobileScene();
 
             AudioController.init(); // Init Audio (muted) FIRST
             LevelManager.init(); // Start Level 1
@@ -760,6 +1028,9 @@
                     gridLights.push(new GridLight(i));
                 }
 
+                // Demo mode also reveals #ui after the initial mobile fit.
+                fitMobileScene();
+
                 // Simplified level init for demo
                 entities.forEach(e => e.destroy());
                 entities = [];
@@ -776,6 +1047,7 @@
         }
 
         function endDemoMode() {
+            updateHighScore(); // Flush final score in case a run ends without a "destroy" event
             gameState = 'START';
             uiContainer.style.display = 'none';
             startScreen.style.display = 'flex';
@@ -821,6 +1093,18 @@
 
         // let consecutiveSuccess = 0; // Moved to global state
 
+        // Narrative Layer: an original "recovered transmission" framing (see the
+        // TRANSMISSION LOG panel on the start screen). Escalating flavor lines
+        // fire at a handful of level milestones during an endless run; the
+        // hidden epilogue fires once, the first time a player reaches deep into
+        // the run, then never repeats (gated via localStorage).
+        const LEVEL_FLAVOR = {
+            3: "IT'S LEARNING YOUR RHYTHM",
+            5: "YOU HAVEN'T LOOKED AWAY",
+            7: "GOOD. KEEP GOING."
+        };
+        const EPILOGUE_LEVEL = 8;
+
         // Level State
         const LevelManager = {
             level: 1,
@@ -858,6 +1142,14 @@
                 // Announce
                 Announcer.show(`LEVEL UP!`, "#00ffff");
                 gameSetTimeout(() => Announcer.show("HURRY UP!", "#fff"), 2000);
+
+                // Narrative layer: sparse, escalating flavor lines as the run goes on.
+                // See LEVEL_FLAVOR / EPILOGUE_LEVEL below.
+                if (LEVEL_FLAVOR[n]) {
+                    gameSetTimeout(() => Announcer.show(LEVEL_FLAVOR[n], "#ff00ff"), 4200);
+                } else if (n === EPILOGUE_LEVEL && !localStorage.getItem('tornadoConesEpilogueSeen')) {
+                    gameSetTimeout(() => showEpilogue(), 4200);
+                }
 
                 // Spawn Configuration
                 // Level 1: 1 Main Tornado
@@ -1017,7 +1309,6 @@
             bgMusicElement: null,
             bgMusicNode: null,
             playlist: [
-                'hologram%20room%20funelling%20discs.mp3',
                 'looping%20a%20disc.mp3',
                 'tornado%20cones.mp3'
             ],
@@ -1446,9 +1737,13 @@
                     // Col = x / 160
                     const col = Math.round((this.x - 60) / 160);
                     const row = Math.round((this.z - 60) / 160);
+                    // Validate col/row independently before flattening to an index —
+                    // an out-of-range col (e.g. -1) can still combine with row into a
+                    // number that's "in bounds" for gridLights but points at an
+                    // unrelated cell (index wraps into the next/previous row).
                     const idx = row * COLS + col;
 
-                    if (idx >= 0 && idx < gridLights.length) {
+                    if (col >= 0 && col < COLS && row >= 0 && row < ROWS && idx >= 0 && idx < gridLights.length) {
                         const light = gridLights[idx];
                         // Check precise distance
                         const d = Math.hypot(this.x - light.x, this.z - light.z);
@@ -1640,205 +1935,6 @@
             }
         }
 
-        class ParticleTornado {
-            constructor() {
-                this.container = document.createElement('div');
-                this.container.className = 'tornado-group-particles';
-                this.container.style.position = 'absolute';
-                this.container.style.left = '0';
-                this.container.style.top = '0';
-                this.container.style.transformStyle = 'preserve-3d';
-                entityLayer.appendChild(this.container);
-
-                this.x = 460;
-                this.z = 460;
-                this.particles = [];
-
-                const particleCount = 200;
-                for (let i = 0; i < particleCount; i++) {
-                    const el = document.createElement('div');
-                    el.style.position = 'absolute';
-                    el.style.width = '6px';
-                    el.style.height = '6px';
-                    el.style.background = 'rgba(180, 150, 255, 0.8)';
-                    el.style.borderRadius = '50%';
-                    el.style.boxShadow = '0 0 5px rgba(180, 150, 255, 0.5)';
-                    this.container.appendChild(el);
-
-                    const p = {
-                        el: el,
-                        h: Math.random() * 300,
-                        angle: Math.random() * Math.PI * 2,
-                        vSpeed: 1 + Math.random() * 2,
-                        noiseOffset: Math.random() * 100
-                    };
-                    this.particles.push(p);
-                }
-            }
-
-            destroy() {
-                if (this.container && this.container.parentElement) {
-                    this.container.parentElement.removeChild(this.container);
-                }
-            }
-
-            resetParticle(p, randomH = false) {
-                p.h = randomH ? Math.random() * 300 : 0;
-                p.angle = Math.random() * Math.PI * 2;
-                p.vSpeed = 1 + Math.random() * 2;
-            }
-
-            update() {
-                // Chase or Wander
-                if (activeDisc) {
-                    const dx = activeDisc.x - this.x;
-                    const dz = activeDisc.z - this.z;
-                    const dist = Math.hypot(dx, dz);
-                    const speed = activeDisc.isGreen ? 3 : 1.5;
-                    if (dist > 10) {
-                        this.x += (dx / dist) * speed;
-                        this.z += (dz / dist) * speed;
-                    }
-                } else {
-                    this.x += Math.sin(getGameTime() * 0.002) * 2; // Wander
-                    this.z += Math.cos(getGameTime() * 0.002) * 2;
-                }
-                this.container.style.transform = `translate3d(${this.x}px, ${this.z}px, 0)`;
-
-                const time = getGameTime() * 0.001;
-                this.particles.forEach(p => {
-                    p.h += p.vSpeed;
-
-                    const progress = Math.max(0, p.h / 300);
-                    const currentRadius = 20 + (130 * Math.pow(progress, 0.8));
-
-                    const angularSpeed = 1000 / (currentRadius * currentRadius + 100);
-                    p.angle += angularSpeed * 10;
-
-                    if (p.h > 350) {
-                        this.resetParticle(p, false);
-                    }
-
-                    const noise = Math.sin(time * 5 + p.noiseOffset) * 10;
-                    const r = currentRadius + noise;
-                    const px = Math.cos(p.angle) * r;
-                    const py = Math.sin(p.angle) * r;
-
-                    p.el.style.transform = `translate3d(${px}px, ${py}px, ${p.h}px)`;
-                });
-            }
-        }
-
-        class CanvasTornado {
-            constructor() {
-                this.x = 460;
-                this.z = 460;
-
-                // Create Canvas Layer
-                this.canvas = document.createElement('canvas');
-                this.canvas.width = 600; // Local canvas size
-                this.canvas.height = 600;
-                this.canvas.style.position = 'absolute';
-                this.canvas.style.left = '50%';
-                this.canvas.style.top = '50%';
-                this.canvas.style.transform = 'translate(-50%, -50%)'; // Centered on its coord
-                this.canvas.style.pointerEvents = 'none';
-
-                // We append it to a container that moves with x,z
-                this.container = document.createElement('div');
-                this.container.className = 'tornado-group-canvas';
-                this.container.style.width = '0px';
-                this.container.style.height = '0px';
-                this.container.style.position = 'absolute';
-                this.container.style.transformStyle = 'preserve-3d';
-
-                this.container.appendChild(this.canvas);
-                entityLayer.appendChild(this.container);
-
-                this.ctx = this.canvas.getContext('2d');
-
-                this.particles = [];
-                // Initialize particles
-                for (let i = 0; i < 300; i++) {
-                    this.particles.push(this.createParticle(true));
-                }
-            }
-
-            createParticle(randomY = false) {
-                return {
-                    y: randomY ? Math.random() * 400 : 0,
-                    angle: Math.random() * Math.PI * 2,
-                    speedY: 2 + Math.random() * 3,
-                    speedR: 0.05 + Math.random() * 0.1,
-                    radiusOffset: Math.random() * 20
-                };
-            }
-
-            destroy() {
-                if (this.container && this.container.parentElement) {
-                    this.container.parentElement.removeChild(this.container);
-                }
-            }
-
-            update() {
-                // Chase Logic (Shared)
-                if (activeDisc) {
-                    const dx = activeDisc.x - this.x;
-                    const dz = activeDisc.z - this.z;
-                    const dist = Math.hypot(dx, dz);
-                    const speed = activeDisc.isGreen ? 3 : 1.5;
-
-                    if (dist > 10) {
-                        this.x += (dx / dist) * speed;
-                        this.z += (dz / dist) * speed;
-                    }
-                } else {
-                    this.x += Math.sin(getGameTime() * 0.002) * 2;
-                    this.z += Math.cos(getGameTime() * 0.002) * 2;
-                }
-
-                // Move the container to the tornado's position on the map
-                this.container.style.transform = `translate3d(${this.x}px, ${this.z}px, 0)`;
-
-                // Render Particles on Canvas
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-                this.ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
-
-                const cx = this.canvas.width / 2;
-                const cy = this.canvas.height;
-
-                this.particles.forEach(p => {
-                    // Update
-                    p.y += p.speedY; // Rise up
-                    p.angle += p.speedR; // Rotate
-
-                    // Funnel Radius
-                    const progress = p.y / 350;
-                    const funnelRadius = 10 + (progress * 140);
-
-                    // Orbit
-                    const r = funnelRadius + p.radiusOffset;
-                    const x = Math.cos(p.angle) * r;
-
-                    // Draw
-                    this.ctx.fillStyle = `hsla(280, 100%, 70%, ${1.0 - progress})`;
-                    this.ctx.beginPath();
-                    this.ctx.arc(cx + x, cy - p.y - 50, 2 + (progress * 4), 0, Math.PI * 2);
-                    this.ctx.fill();
-
-                    // Reset
-                    if (p.y > 400) {
-                        const newP = this.createParticle();
-                        Object.assign(p, newP);
-                    }
-                });
-
-                // Align Canvas to stand up
-                this.canvas.style.transform = 'translate(-50%, -50%) rotateX(-90deg)';
-            }
-        }
-
         class FlyingDisc {
             constructor(originLight) {
                 this.el = document.createElement('div');
@@ -2020,6 +2116,7 @@
                             score++;
                             consecutiveSuccess++;
                             uiScore.innerText = "SCORE: " + score;
+                            updateHighScore();
                             Haptics.triggerSuccess();
 
                             // Announce
@@ -2046,7 +2143,10 @@
                             if (remaining === 0 && gameState === 'PLAYING') {
                                 Announcer.show("YOU LOSE - ALL CONES LOST", "#ff4444");
                                 gameSetTimeout(() => {
-                                    endDemoMode(); // Hacky reuse to return to start screen
+                                    // Guard: only bail out to the start screen if we're still
+                                    // in the state that scheduled this — avoids stomping on a
+                                    // state the player has already moved on from in the interim.
+                                    if (gameState === 'PLAYING') endDemoMode(); // Hacky reuse to return to start screen
                                 }, 3000);
                             } else if (remaining === 0 && gameState === 'DEMO') {
                                 endDemoMode();
@@ -2126,6 +2226,44 @@
         }
 
 
+        // --- Narrative Layer: Lore Modal & Epilogue ---
+        const loreModal = document.getElementById('lore-modal');
+        const loreTrigger = document.getElementById('lore-trigger');
+        const loreModalClose = document.getElementById('lore-modal-close');
+        const epilogueOverlay = document.getElementById('epilogue-overlay');
+
+        function openLoreModal() {
+            loreModal.classList.add('visible');
+        }
+        function closeLoreModal() {
+            loreModal.classList.remove('visible');
+        }
+        loreTrigger.addEventListener('click', openLoreModal);
+        loreModalClose.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeLoreModal();
+        });
+        // Also dismiss on backdrop click (tapping outside the panel), not the panel itself
+        loreModal.addEventListener('click', (e) => {
+            if (e.target === loreModal) closeLoreModal();
+        });
+
+        function showEpilogue() {
+            if (epilogueActive) return;
+            if (gameState !== 'PLAYING') return; // Only during a real run, never over DEMO/START
+            epilogueActive = true;
+            localStorage.setItem('tornadoConesEpilogueSeen', '1');
+            gameState = 'PAUSED'; // Freeze gameplay (loop()/gameSetTimeout already respect this)
+            epilogueOverlay.classList.add('visible');
+        }
+        function hideEpilogue() {
+            if (!epilogueActive) return;
+            epilogueActive = false;
+            epilogueOverlay.classList.remove('visible');
+            gameState = 'PLAYING';
+        }
+        epilogueOverlay.addEventListener('click', hideEpilogue);
+
         // --- Init ---
         function init() {
             // Setup Initial State
@@ -2143,21 +2281,148 @@
         // Input
         // --- Input & Device Detection ---
 
-        // Simple Mobile Detection
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth < 800 && 'ontouchstart' in window);
+        // Mobile Detection
+        // Touch capability is static per device - used to decide whether to wire
+        // up joystick touch handling at all (harmless no-op on non-touch desktops).
+        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-        if (isMobile) {
-            document.body.classList.add('is-mobile');
+        // The "should we use the mobile layout" call is fuzzier and can change at
+        // runtime (rotation, split-screen/foldables, resizing a window near the
+        // threshold), so it's a function re-run on resize, not a one-time const.
+        //
+        // Once we've positively identified a real phone/tablet (UA match, or the
+        // iPad heuristic), remember that and keep the mobile layout regardless of
+        // width - a phone rotated to landscape can easily exceed the 800px
+        // fallback check below (e.g. a 390-wide phone is 844 wide sideways),
+        // which would otherwise flip it back to the desktop/keyboard layout just
+        // from rotating. This is deliberately NOT applied to the width-only
+        // fallback itself, which stays purely reactive - that check alone is too
+        // ambiguous to commit to (a touch-capable desktop browser resized narrow
+        // would otherwise get stuck showing a giant joystick forever after).
+        let confirmedMobileDevice = false;
+        function computeIsMobileLayout() {
+            const uaMatch = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            // iPadOS 13+ spoofs a desktop Safari/Mac user agent by default, and an
+            // iPad's width often exceeds the 800px check below - this is the
+            // standard way to still catch it as a touch device.
+            const iPadMatch = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+            if (uaMatch || iPadMatch) confirmedMobileDevice = true;
+            return confirmedMobileDevice || (window.innerWidth < 800 && hasTouch);
+        }
+
+        // Fits the 3D grid and sizes the joystick to whatever vertical/horizontal
+        // space is actually available on this device, instead of the old fixed
+        // scale(0.42) + 480px bottom reservation that overflowed the viewport on
+        // shorter/narrower phones and in landscape (grid mostly off-screen).
+        function fitMobileScene() {
+            const root = document.documentElement;
+            if (!document.body.classList.contains('is-mobile')) {
+                root.style.removeProperty('--scene-scale');
+                root.style.removeProperty('--scene-top');
+                root.style.removeProperty('--joystick-size');
+                root.style.removeProperty('--joystick-knob-size');
+                root.style.removeProperty('--joystick-bottom');
+                return;
+            }
+
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+
+            // Joystick: comfortable touch size, but shrinks on short viewports
+            // (e.g. a landscape phone) instead of always eating 480px from the
+            // bottom edge regardless of how tall the screen actually is.
+            const joystickSize = Math.max(110, Math.min(190, vh * 0.26, vw * 0.4));
+            const joystickBottom = 16;
+            root.style.setProperty('--joystick-size', joystickSize.toFixed(0) + 'px');
+            root.style.setProperty('--joystick-knob-size', (joystickSize * 0.42).toFixed(0) + 'px');
+            root.style.setProperty('--joystick-bottom', joystickBottom + 'px');
+
+            // Measure the actual rendered HUD height (status/score/hint text)
+            // rather than guessing a constant - stays correct even if the hint
+            // text wraps differently across font sizes/widths.
+            const uiEl = document.getElementById('ui');
+            const hsEl = document.getElementById('high-score-display');
+            const uiBottom = uiEl ? uiEl.getBoundingClientRect().bottom : 0;
+            const hsBottom = hsEl ? hsEl.getBoundingClientRect().bottom : 0;
+            const topReserved = Math.max(uiBottom, hsBottom, 90) + 16;
+
+            const bottomReserved = joystickBottom + joystickSize + 20;
+            const availableW = vw - 32;
+            const availableH = vh - topReserved - bottomReserved;
+
+            // The grid sits under rotateX(60deg) + the body's perspective:800px,
+            // so its on-screen size is NOT simply proportional to `scale` - a
+            // larger scale pushes more of the tilted plane's depth toward the
+            // viewer, which the perspective projection expands non-linearly
+            // (measured: width/scale and height/scale both grow with scale, they
+            // aren't constant). Rather than fit an approximation to that curve,
+            // measure the real rendered size at a candidate scale and converge.
+            const scene = document.querySelector('.scene');
+            const grid = document.getElementById('grid');
+            const prevAnimation = scene.style.animation;
+            scene.style.animation = 'none'; // freeze the wobble for a stable measurement
+
+            let scale = 0.35;
+            for (let i = 0; i < 6; i++) {
+                root.style.setProperty('--scene-scale', scale.toFixed(4));
+                void scene.offsetHeight; // force reflow so getBoundingClientRect reflects this scale
+                const r = grid.getBoundingClientRect();
+                if (r.width <= 0 || r.height <= 0) break;
+                const ratio = Math.min(availableW / r.width, availableH / r.height);
+                if (Math.abs(ratio - 1) < 0.02) break; // close enough
+                // Damped step (0.9) so the search converges instead of oscillating
+                // around the non-linear curve.
+                scale = Math.max(0.08, Math.min(0.55, scale * (1 + (ratio - 1) * 0.9)));
+            }
+            root.style.setProperty('--scene-scale', scale.toFixed(4));
+
+            // `top` positions the pre-transform box, but rotateX + the ancestor's
+            // perspective project that non-uniformly onto the screen (points at
+            // different simulated depths shift by different amounts), so a target
+            // Y position can't be computed by formula either - converge on it the
+            // same way, correcting by the measured error each pass.
+            let sceneTop = topReserved;
+            for (let i = 0; i < 4; i++) {
+                root.style.setProperty('--scene-top', sceneTop.toFixed(0) + 'px');
+                void scene.offsetHeight;
+                const r = grid.getBoundingClientRect();
+                const desiredTop = topReserved + Math.max(0, (availableH - r.height) / 2);
+                const delta = desiredTop - r.top;
+                if (Math.abs(delta) < 2) break;
+                sceneTop += delta;
+            }
+            scene.style.animation = prevAnimation || ''; // restore the wobble animation
+        }
+
+        function applyMobileLayout() {
+            const mobile = computeIsMobileLayout();
+            document.body.classList.toggle('is-mobile', mobile);
             const hint = document.getElementById('controls-hint');
             if (hint) {
-                hint.innerHTML = `
+                hint.innerHTML = mobile ? `
                     (TAP ANYWHERE) Launch/Drop<br>
                     (JOYSTICK) Fly<br>
                     1. Survive while RED.<br>
                     2. Get caught when GREEN.
+                ` : `
+                    [SPACE] Launch/Drop | [WASD/Arrows] Fly<br>
+                    1. Survive while RED.<br>
+                    2. Get caught when GREEN.
                 `;
             }
+            fitMobileScene();
         }
+        applyMobileLayout();
+
+        // Re-classify on rotation/resize (e.g. a tablet crossing the width
+        // threshold, or a foldable/split-screen size change) rather than freezing
+        // the mobile/desktop layout choice at whatever was true on first paint.
+        let layoutResizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(layoutResizeTimer);
+            layoutResizeTimer = setTimeout(applyMobileLayout, 250);
+        });
+        window.addEventListener('orientationchange', applyMobileLayout);
 
         // 1. Keyboard (Desktop Primary)
         window.addEventListener('keydown', e => {
@@ -2191,8 +2456,8 @@
         });
 
         window.addEventListener('keyup', e => {
-            if (gameState === 'PAUSED') return;
-
+            // Always release keys, even while paused — otherwise a key let go
+            // mid-pause stays "held" forever and the disc drifts on resume.
             if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = false;
             if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = false;
             if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.s = false;
@@ -2205,8 +2470,11 @@
             if (gameState === 'START') return;
             if (gameState === 'PAUSED') return; // Ignore interactions when paused
 
-            // If touching joystick, ignore
-            if (e.target.closest('.joystick-container')) return;
+            // Ignore taps on the joystick or any other UI chrome (audio/pause icons,
+            // lore trigger, modals) - without this, preventDefault() below suppresses
+            // the browser's synthetic click on these buttons (breaking them on real
+            // touch devices) AND launches/drops the active disc as a side effect.
+            if (e.target.closest('.joystick-container, #audio-controls, .modal-overlay, #lore-trigger')) return;
 
             // Prevent default if it's a touch event to stop scrolling/zooming (except on buttons if any)
             if (e.type === 'touchstart') e.preventDefault();
@@ -2238,43 +2506,65 @@
         window.addEventListener('touchstart', handleInteraction, { passive: false });
 
         // 3. Joystick Logic (Mobile Movement)
-        if (isMobile) {
+        // Wired up for any touch-capable device, not just ones classified as
+        // "mobile layout" at load - that classification can change on resize/
+        // rotation (see applyMobileLayout above), and a device that's initially
+        // misjudged as desktop should still have working joystick input the
+        // moment CSS reveals it. It's a harmless no-op on non-touch desktops.
+        if (hasTouch) {
             const joystick = document.getElementById('joystick');
             const knob = document.getElementById('joystick-knob');
 
             let joystickActive = false;
-            let joyStartX, joyStartY;
-            const maxRadius = 70; // Max drag distance
+            let activeTouchId = null; // Track a specific touch by identifier, not by array
+            // index - touches[0] isn't guaranteed to stay "our" finger once a
+            // second touch (e.g. a tap-to-launch elsewhere) is added or removed.
+            let originX = 0, originY = 0; // Anchored to where the thumb actually
+            // touched down (see touchstart below), not the container's fixed
+            // center - anchoring to center made the knob (and the WASD input it
+            // drives) jump the instant you touched anywhere off-center.
+
+            // Derived from the container's actual rendered size (which is now
+            // dynamic - see fitMobileScene/--joystick-size) rather than a
+            // hardcoded 70px tuned for the old fixed 240px container, so the
+            // drag distance and deadzone stay proportionally correct at any size.
+            function getMaxRadius() {
+                const rect = joystick.getBoundingClientRect();
+                return Math.max(24, rect.width / 2 - 10);
+            }
 
             joystick.addEventListener('touchstart', (e) => {
                 if (gameState === 'PAUSED') return;
+                if (joystickActive) return; // Already tracking a finger - ignore a second one landing here
                 e.preventDefault();
                 Announcer.recordInteraction();
-                joystickActive = true;
-                const touch = e.touches[0];
-                const rect = joystick.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
 
-                updateJoystick(touch.clientX, touch.clientY, centerX, centerY);
+                const touch = e.changedTouches[0];
+                joystickActive = true;
+                activeTouchId = touch.identifier;
+                originX = touch.clientX;
+                originY = touch.clientY;
+
+                updateJoystick(0, 0);
             }, { passive: false });
 
             joystick.addEventListener('touchmove', (e) => {
                 if (gameState === 'PAUSED') return;
-                e.preventDefault();
                 if (!joystickActive) return;
-                const touch = e.touches[0];
-                const rect = joystick.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
+                const touch = Array.from(e.touches).find(t => t.identifier === activeTouchId);
+                if (!touch) return; // This move doesn't belong to our tracked finger
+                e.preventDefault();
 
-                updateJoystick(touch.clientX, touch.clientY, centerX, centerY);
+                updateJoystick(touch.clientX - originX, touch.clientY - originY);
             }, { passive: false });
 
             const endJoystick = (e) => {
-                if (gameState === 'PAUSED') return;
+                if (!joystickActive) return;
+                const ended = Array.from(e.changedTouches).some(t => t.identifier === activeTouchId);
+                if (!ended) return; // A different finger ended - ours is still down
                 e.preventDefault();
                 joystickActive = false;
+                activeTouchId = null;
                 knob.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
                 keys.w = false;
                 keys.s = false;
@@ -2285,9 +2575,8 @@
             joystick.addEventListener('touchend', endJoystick);
             joystick.addEventListener('touchcancel', endJoystick);
 
-            function updateJoystick(clientX, clientY, centerX, centerY) {
-                let dx = clientX - centerX;
-                let dy = clientY - centerY;
+            function updateJoystick(dx, dy) {
+                const maxRadius = getMaxRadius();
                 const dist = Math.hypot(dx, dy);
 
                 // Clamp
@@ -2300,9 +2589,9 @@
                 // Move Knob
                 knob.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px)`;
 
-                // Map to Keys (WASD)
-                // Thresholds
-                const threshold = 20;
+                // Map to Keys (WASD) - same ~28.6% deadzone ratio as the
+                // original fixed 20/70, just scaled to the current size.
+                const threshold = maxRadius * (20 / 70);
                 keys.w = dy < -threshold;
                 keys.s = dy > threshold;
                 keys.a = dx < -threshold;
@@ -2362,14 +2651,20 @@
             }
         }
 
+        // Single source of truth for pause/resume — used by both the keyboard
+        // shortcut (P/Escape) and the handbrake icon click. Previously these
+        // were two separate implementations that could desync `body.is-paused`
+        // (e.g. pause via click, resume via keyboard left the class stuck on,
+        // which permanently freezes every future announcement's CSS animation).
         function togglePause() {
-            if (gameState === 'START' || gameState === 'DEMO') return;
+            if (gameState === 'START' || gameState === 'DEMO' || epilogueActive) return;
 
             const pauseOverlay = document.getElementById('pause-overlay');
             const uiControls = document.getElementById('ui'); // Assuming 'ui' is the main game UI container
 
             if (gameState === 'PLAYING') {
                 gameState = 'PAUSED';
+                document.body.classList.add('is-paused');
                 uiControls.style.display = 'none';
                 pauseOverlay.style.display = 'flex';
                 togglePauseBtn.classList.remove('icon-off');
@@ -2377,10 +2672,13 @@
                 AudioController.suspend();
             } else if (gameState === 'PAUSED') {
                 gameState = 'PLAYING';
+                document.body.classList.remove('is-paused');
                 uiControls.style.display = 'block';
                 pauseOverlay.style.display = 'none';
                 togglePauseBtn.classList.remove('icon-on');
                 togglePauseBtn.classList.add('icon-off'); // Magenta means "Unpaused"
+                Announcer.show("GO!", "#00ff00");
+                Haptics.triggerSuccess();
                 AudioController.resume();
             }
         }
@@ -2427,25 +2725,7 @@
 
         togglePauseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (gameState === 'START' || gameState === 'DEMO') return;
-
-            if (gameState === 'PLAYING') {
-                gameState = 'PAUSED';
-                document.body.classList.add('is-paused');
-                uiContainer.style.display = 'none';
-                document.getElementById('pause-overlay').style.display = 'flex';
-                e.target.className = "audio-icon icon-on"; // Green means "Paused"
-                AudioController.suspend();
-            } else if (gameState === 'PAUSED') {
-                gameState = 'PLAYING';
-                document.body.classList.remove('is-paused');
-                uiContainer.style.display = 'block';
-                document.getElementById('pause-overlay').style.display = 'none';
-                e.target.className = "audio-icon icon-off"; // Magenta means "Unpaused"
-                Announcer.show("GO!", "#00ff00");
-                Haptics.triggerSuccess();
-                AudioController.resume();
-            }
+            togglePause();
         });
 
         init();
